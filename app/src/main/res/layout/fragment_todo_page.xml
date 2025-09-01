@@ -29,5 +29,8 @@
         android:background="@android:color/transparent"
         android:contentDescription="Add To-Do"
         android:padding="12dp"
-        android:src="@android:drawable/ic_input_add" />
+        android:src="@android:drawable/ic_input_add"
+        android:elevation="12dp"
+        android:clickable="true"
+        android:focusable="true" />
 </FrameLayout>

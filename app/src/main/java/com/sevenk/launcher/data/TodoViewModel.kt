@@ -13,6 +13,7 @@ class TodoViewModel(private val dao: TodoDao) : ViewModel() {
 
     fun insert(item: TodoItem) = viewModelScope.launch {
         dao.insert(item)
+        println("Inserted item: ${item.task}") // Debug log
     }
 
     fun update(item: TodoItem) = viewModelScope.launch {
