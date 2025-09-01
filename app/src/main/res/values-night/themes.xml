@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.SevenKLauncher" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/sevenk_primary</item>
+        <item name="colorPrimaryVariant">@color/sevenk_primary</item>
+        <item name="colorOnPrimary">@color/white</item>
+
+        <item name="colorSecondary">@color/sevenk_secondary</item>
+        <item name="colorSecondaryVariant">@color/sevenk_secondary</item>
+        <item name="colorOnSecondary">@color/black</item>
+
+        <!-- Transparent system bars with light icons disabled for dark mode -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowTranslucentStatus">true</item>
+
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowTranslucentNavigation">true</item>
+        <item name="android:windowLightNavigationBar">false</item>
+
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+
+        <item name="android:textColor">@color/sevenk_text_primary</item>
+        <item name="android:textColorPrimary">@color/sevenk_text_primary</item>
+        <item name="android:textColorSecondary">@color/sevenk_text_secondary</item>
+        <!-- Baseline typography and background (use safe system font) -->
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:colorBackground">@color/sevenk_bg</item>
+        <!-- Map headline appearance to Montserrat Bold token -->
+        <item name="textAppearanceHeadline6">@style/TextAppearance.SevenK.Title</item>
+        <item name="textAppearanceHeadline5">@style/TextAppearance.SevenK.Title</item>
+
+        <item name="materialButtonStyle">@style/Widget.App.Button</item>
+        <item name="cardViewStyle">@style/Widget.App.CardView</item>
+        <item name="toolbarStyle">@style/Widget.App.Toolbar</item>
+        <item name="actionBarTheme">@style/ThemeOverlay.MaterialComponents.Dark.ActionBar</item>
+        <item name="materialThemeOverlay">@style/ThemeOverlay.SevenKLauncher</item>
+    </style>
+</resources>
+

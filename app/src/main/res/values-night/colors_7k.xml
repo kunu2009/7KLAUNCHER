@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 7K Brand Palette (Dark) -->
+    <color name="sevenk_bg">#13262f</color> <!-- Gable Green -->
+    <color name="sevenk_primary">#366e8d</color> <!-- Calypso -->
+    <color name="sevenk_secondary">#17557b</color> <!-- Chathams Blue -->
+    <color name="sevenk_text_primary">#d3d0cb</color> <!-- Timberwolf -->
+    <color name="sevenk_text_secondary">#828f9a</color> <!-- Regent Gray -->
+    <color name="sevenk_divider">#a9abae</color> <!-- Bombay -->
+
+    <!-- Adaptive Glass (Dark) -->
+    <color name="glass_tint">#6613262F</color> <!-- ~40% #13262F overlay -->
+    <color name="glass_inner">#3313262F</color>
+    <color name="glass_stroke">#8013262F</color>
+
+    <!-- Search/Focus ring -->
+    <color name="focus_ring">#366e8d</color> <!-- Calypso highlight -->
+</resources>

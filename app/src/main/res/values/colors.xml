@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand colors -->
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    
+    <!-- Basic colors -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    
+    <!-- Transparent colors -->
+    <color name="transparent">#00000000</color>
+    <color name="transparent_black">#80000000</color>
+    <color name="semi_transparent_white">#80FFFFFF</color>
+    
+    <!-- Launcher icon colors -->
+    <color name="ic_launcher_background">#2196F3</color>
+    <color name="ic_launcher_foreground">#FFFFFF</color>
+    
+    <!-- Widget colors -->
+    <color name="widget_background">#4D000000</color>
+    <color name="widget_text">#FFFFFF</color>
+    
+    <!-- Status bar colors -->
+    <color name="status_bar_color">#40000000</color>
+    
+    <!-- Navigation bar colors -->
+    <color name="nav_bar_color">#00000000</color>
+    
+    <!-- Material 3 colors -->
+    <color name="sevenk_primary_light">#6750A4</color>
+    <color name="sevenk_primary_dark">#D0BCFF</color>
+    <color name="sevenk_secondary_light">#625B71</color>
+    <color name="sevenk_secondary_dark">#CCC2DC</color>
+    <color name="sevenk_background_light">#FFFBFE</color>
+    <color name="sevenk_background_dark">#1C1B1F</color>
+    <color name="sevenk_surface_light">#FFFBFE</color>
+    <color name="sevenk_surface_dark">#1C1B1F</color>
+    
+    <!-- Error colors -->
+    <color name="error">#B3261E</color>
+    <color name="on_error">#FFFFFF</color>
+    <color name="error_container">#F9DEDC</color>
+    <color name="on_error_container">#410E0B</color>
+    
+    <!-- Incognito UI colors -->
+    <color name="incognito_primary">#FF8A8A8A</color>
+    <color name="incognito_background">#FF2B2B2B</color>
+</resources>

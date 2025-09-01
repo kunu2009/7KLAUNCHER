@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="icon_size">48dp</dimen>
+    <dimen name="icon_text_size">12sp</dimen>
+    <dimen name="dock_height">72dp</dimen>
+    <dimen name="sidebar_width">80dp</dimen>
+    <dimen name="app_icon_size">48dp</dimen>
+    <dimen name="app_icon_text_size">12sp</dimen>
+    <dimen name="app_icon_padding">8dp</dimen>
+    <dimen name="app_icon_size_small">40dp</dimen>
+    <dimen name="app_icon_size_medium">48dp</dimen>
+    <dimen name="app_icon_size_large">56dp</dimen>
+    <dimen name="widget_corner_radius">16dp</dimen>
+
+    <!-- Spacing scale -->
+    <dimen name="space_xs">4dp</dimen>
+    <dimen name="space_s">8dp</dimen>
+    <dimen name="space_m">12dp</dimen>
+    <dimen name="space_l">16dp</dimen>
+    <dimen name="space_xl">24dp</dimen>
+    <dimen name="space_2xl">32dp</dimen>
+
+    <!-- Common insets for launcher layouts -->
+    <dimen name="inset_top">72dp</dimen>
+    <dimen name="inset_bottom">120dp</dimen>
+    <dimen name="inset_horizontal">16dp</dimen>
+    <dimen name="inset_right_home">96dp</dimen>
+
+    <!-- Gesture/handle sizes -->
+    <dimen name="edge_handle_width">16dp</dimen>
+
+    <!-- Sidebar specific paddings -->
+    <dimen name="sidebar_padding_top">24dp</dimen>
+    <dimen name="sidebar_padding_bottom">100dp</dimen>
+</resources>

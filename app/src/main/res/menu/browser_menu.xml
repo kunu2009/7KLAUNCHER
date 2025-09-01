@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_share"
+        android:icon="@drawable/ic_share"
+        android:title="@string/share"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_find_in_page"
+        android:icon="@drawable/ic_search"
+        android:title="Find in page"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_desktop_site"
+        android:checkable="true"
+        android:title="Desktop site" />
+
+    <item
+        android:id="@+id/action_add_to_home"
+        android:title="Add to Home screen" />
+
+    <item
+        android:id="@+id/action_settings"
+        android:title="Settings" />
+
+    <item
+        android:id="@+id/action_help"
+        android:title="Help &amp; feedback" />
+</menu>

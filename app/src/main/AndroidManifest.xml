@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" 
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <uses-permission android:name="android.permission.BIND_APPWIDGET" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
+        android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.FLASHLIGHT" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    
+    <!-- Queries for package visibility -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
+    <application
+        android:name=".SevenKApplication"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.SevenKLauncher"
+        android:usesCleartextTraffic="true"
+        tools:replace="android:label,android:theme">
+        
+        <!-- 7K Browser (Embedded App) -->
+        <activity
+            android:name="com.sevenk.browser.BrowserActivity"
+            android:exported="true"
+            android:label="7K Browser"
+            android:icon="@mipmap/ic_launcher_browser"
+            android:theme="@style/Theme.SevenKLauncher">
+            <!-- No MAIN/LAUNCHER intent filter - launched internally from launcher -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+            </intent-filter>
+        </activity>
+
+        <!-- 7K Launcher (Home Screen) -->
+        <!-- Main Launcher (Home Screen) -->
+        <activity
+            android:name=".LauncherActivity"
+            android:clearTaskOnLaunch="true"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="nosensor"
+            android:stateNotNeeded="true"
+            android:theme="@style/Theme.SevenKLauncher"
+            android:windowSoftInputMode="stateHidden|adjustPan">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- 7K Settings (No Launcher) -->
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="true"
+            android:label="7K Settings"
+            android:icon="@drawable/ic_settings_7k">
+        </activity>
+
+        <receiver
+            android:name=".AppWidget"
+            android:label="@string/app_name"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/app_widget_info" />
+        </receiver>
+
+        <!-- TODO Widget -->
+        <activity
+            android:name=".TodoWidgetConfigActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SevenKLauncher" />
+
+        <receiver
+            android:name=".TodoWidgetProvider"
+            android:exported="true"
+            android:label="7K TODO">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/todo_widget_info" />
+        </receiver>
+
+        <service
+            android:name=".TodoWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+
+        <!-- Internal Photo Editor -->
+        <activity
+            android:name="com.sevenk.studio.StudioActivity"
+            android:exported="false"
+            android:label="7KSTUDIO"
+            android:theme="@style/Theme.SevenKLauncher" />
+        <activity
+            android:name="com.sevenk.studio.PhotoEditorActivity"
+            android:exported="false"
+            android:label="Photo Editor"
+            android:theme="@style/Theme.SevenKLauncher" />
+        <activity
+            android:name="com.sevenk.studio.VideoEditorActivity"
+            android:exported="false"
+            android:label="Video Editor"
+            android:theme="@style/Theme.SevenKLauncher" />
+
+        <!-- Internal Web App wrapper -->
+        <activity
+            android:name=".WebAppActivity"
+            android:exported="false"
+            android:label="Web App"
+            android:theme="@style/Theme.SevenKLauncher" />
+
+        <!-- Add FileProvider for file sharing if needed -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+    </application>
+</manifest>

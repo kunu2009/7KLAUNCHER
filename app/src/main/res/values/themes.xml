@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Theme.SevenKLauncher" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Primary brand colors mapped to 7K palette (adaptive via values-night) -->
+        <item name="colorPrimary">@color/sevenk_primary</item>
+        <item name="colorPrimaryVariant">@color/sevenk_primary</item>
+        <item name="colorOnPrimary">@color/white</item>
+
+        <!-- Secondary brand color -->
+        <item name="colorSecondary">@color/sevenk_secondary</item>
+        <item name="colorSecondaryVariant">@color/sevenk_secondary</item>
+        <item name="colorOnSecondary">@color/black</item>
+        
+        <!-- Status bar color. -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <!-- Light theme: dark icons on status bar -->
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowTranslucentStatus">true</item>
+        
+        <!-- Navigation bar color -->
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowTranslucentNavigation">true</item>
+        <!-- Light theme: dark icons on navigation bar -->
+        <item name="android:windowLightNavigationBar">true</item>
+        
+        <!-- Window settings -->
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        
+        <!-- Text appearance (adaptive via tokens) -->
+        <item name="android:textColor">@color/sevenk_text_primary</item>
+        <item name="android:textColorPrimary">@color/sevenk_text_primary</item>
+        <item name="android:textColorSecondary">@color/sevenk_text_secondary</item>
+        <!-- Baseline typography and background -->
+        <!-- Use a safe built-in system font to avoid runtime font decode issues -->
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:colorBackground">@color/sevenk_bg</item>
+        <!-- Map headline appearance to Montserrat Bold token -->
+        <item name="textAppearanceHeadline6">@style/TextAppearance.SevenK.Title</item>
+        <item name="textAppearanceHeadline5">@style/TextAppearance.SevenK.Title</item>
+        
+        <!-- Button styles -->
+        <item name="materialButtonStyle">@style/Widget.App.Button</item>
+        
+        <!-- CardView style -->
+        <item name="cardViewStyle">@style/Widget.App.CardView</item>
+        
+        <!-- AppCompat styles -->
+        <item name="toolbarStyle">@style/Widget.App.Toolbar</item>
+        <item name="actionBarTheme">@style/ThemeOverlay.MaterialComponents.Dark.ActionBar</item>
+        
+        <!-- Material Components theming -->
+        <item name="materialThemeOverlay">@style/ThemeOverlay.SevenKLauncher</item>
+    </style>
+
+    <!-- Material Theme Overlay -->
+    <style name="ThemeOverlay.SevenKLauncher" parent="">
+        <item name="colorSurface">@color/transparent_black</item>
+        <item name="colorOnSurface">@android:color/white</item>
+        <item name="colorControlNormal">@android:color/white</item>
+        <item name="colorControlActivated">@color/teal_200</item>
+        <item name="colorControlHighlight">@color/teal_200</item>
+    </style>
+
+    <!-- Button Style -->
+    <style name="Widget.App.Button" parent="Widget.MaterialComponents.Button">
+        <item name="backgroundTint">@color/teal_200</item>
+        <item name="android:textColor">@color/black</item>
+        <item name="cornerRadius">24dp</item>
+        <item name="android:padding">12dp</item>
+    </style>
+
+    <!-- CardView Style -->
+    <style name="Widget.App.CardView" parent="Widget.MaterialComponents.CardView">
+        <item name="cardBackgroundColor">@color/transparent_black</item>
+        <item name="cardElevation">4dp</item>
+        <item name="cardCornerRadius">16dp</item>
+        <item name="contentPadding">16dp</item>
+    </style>
+
+    <!-- Toolbar Style -->
+    <style name="Widget.App.Toolbar" parent="Widget.MaterialComponents.Toolbar">
+        <item name="android:background">@color/transparent_black</item>
+        <item name="titleTextColor">@android:color/white</item>
+        <item name="subtitleTextColor">@color/semi_transparent_white</item>
+    </style>
+
+    <!-- Text Appearance for Titles using Montserrat Bold -->
+    <style name="TextAppearance.Material3.Headline6" parent="TextAppearance.MaterialComponents.Headline6">
+        <item name="android:textSize">20sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textStyle">normal</item>
+        <item name="android:letterSpacing">0.0125</item>
+    </style>
+    
+    <!-- Shape Appearances -->
+    <style name="ShapeAppearance.App.SmallComponent" parent="ShapeAppearance.Material3.SmallComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">4dp</item>
+    </style>
+    
+    <style name="ShapeAppearance.App.MediumComponent" parent="ShapeAppearance.Material3.MediumComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">8dp</item>
+    </style>
+    
+    <!-- Button Styles -->
+    <style name="Widget.App.Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:textAppearance">@style/TextAppearance.Material3.LabelLarge</item>
+        <item name="strokeColor">@color/sevenk_primary_light</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:minHeight">40dp</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.App.MediumComponent</item>
+    </style>
+    
+    <!-- Browser Theme -->
+    <style name="Theme.SevenK.Browser" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Primary brand color -->
+        <item name="colorPrimary">@color/sevenk_primary_light</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorPrimaryContainer">@color/sevenk_primary_light</item>
+        <item name="colorOnPrimaryContainer">@color/white</item>
+        <item name="colorSecondary">@color/sevenk_secondary_light</item>
+        <item name="colorOnSecondary">@color/white</item>
+        <item name="colorSecondaryContainer">@color/sevenk_secondary_light</item>
+        <item name="colorOnSecondaryContainer">@color/white</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        
+        <!-- Secondary brand color -->
+        <item name="colorSecondary">@color/sevenk_secondary</item>
+        <item name="colorOnSecondary">@color/white</item>
+        <item name="colorSecondaryContainer">@color/sevenk_secondary_light</item>
+        <item name="colorOnSecondaryContainer">@color/black</item>
+        
+        <!-- Status bar -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowTranslucentStatus">true</item>
+        
+        <!-- Navigation bar -->
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowTranslucentNavigation">true</item>
+        
+        <!-- Window settings -->
+        <item name="android:windowBackground">@color/sevenk_bg</item>
+        <item name="android:colorBackground">@color/sevenk_bg</item>
+        
+        <!-- Typography -->
+        <item name="textAppearanceHeadlineSmall">@style/TextAppearance.SevenK.HeadlineSmall</item>
+        <item name="textAppearanceTitleMedium">@style/TextAppearance.SevenK.TitleMedium</item>
+        <item name="textAppearanceBodyMedium">@style/TextAppearance.SevenK.BodyMedium</item>
+        
+        <!-- Button styles -->
+        <item name="materialButtonStyle">@style/Widget.App.Button</item>
+        <item name="materialButtonOutlinedStyle">@style/Widget.App.Button.Outlined</item>
+        
+        <!-- Card style -->
+        <item name="cardViewStyle">@style/Widget.App.CardView</item>
+        
+        <!-- Shape appearance -->
+        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.App.SmallComponent</item>
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.App.MediumComponent</item>
+    </style>
+    
+    <!-- Text Appearances -->
+    <style name="TextAppearance.SevenK.HeadlineSmall" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="fontFamily">sans-serif-medium</item>
+        <item name="android:textSize">20sp</item>
+    </style>
+    
+    <style name="TextAppearance.SevenK.TitleMedium" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="fontFamily">sans-serif-medium</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+    
+    <style name="TextAppearance.SevenK.BodyMedium" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="fontFamily">sans-serif</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+    
+    <style name="TextAppearance.SevenK.Title" parent="TextAppearance.Material3.Headline6">
+        <!-- Use system medium weight to avoid referencing problematic bundled font -->
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="fontFamily">sans-serif-medium</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.01</item>
+    </style>
+
+    <!-- App Theme for Dialogs -->
+    <style name="Theme.SevenKLauncher.Dialog" parent="ThemeOverlay.MaterialComponents.Dialog">
+        <item name="android:windowBackground">@drawable/dialog_background</item>
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:windowCloseOnTouchOutside">true</item>
+        <item name="colorBackgroundFloating">@color/transparent_black</item>
+    </style>
+</resources>

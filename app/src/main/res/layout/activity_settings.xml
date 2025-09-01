@@ -1,0 +1,336 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="7K Settings"
+            android:textStyle="bold"
+            android:textSize="20sp"
+            android:paddingBottom="12dp" />
+
+        <Switch
+            android:id="@+id/swShowDock"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Show Dock" />
+
+        <Switch
+            android:id="@+id/swShowSidebar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Show Sidebar" />
+
+        <Switch
+            android:id="@+id/swShowLabels"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Show Labels" />
+
+        <Switch
+            android:id="@+id/swHideSearch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Hide Search Box in Drawer" />
+
+        <Switch
+            android:id="@+id/swSwipeClose"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Enable Swipe-to-Close Drawer" />
+
+        <Switch
+            android:id="@+id/swPowerSaver"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Launcher Power Saver" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Drawer Columns"
+            android:paddingTop="12dp" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <SeekBar
+                android:id="@+id/sbColumns"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content" />
+            <TextView
+                android:id="@+id/tvColumnsValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="5"
+                android:paddingStart="8dp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Icon Size"
+            android:paddingTop="12dp" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <SeekBar
+                android:id="@+id/sbIconSize"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content" />
+            <TextView
+                android:id="@+id/tvIconSizeValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Medium"
+                android:paddingStart="8dp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Dock Icon Size"
+            android:paddingTop="12dp" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <SeekBar
+                android:id="@+id/sbDockIconSize"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content" />
+            <TextView
+                android:id="@+id/tvDockIconSizeValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Medium"
+                android:paddingStart="8dp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Dock Length"
+            android:paddingTop="12dp" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <SeekBar
+                android:id="@+id/sbDockLength"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content" />
+            <TextView
+                android:id="@+id/tvDockLengthValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="5"
+                android:paddingStart="8dp" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnManageDockApps"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Manage Dock Apps" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Dock Position"
+            android:paddingTop="12dp" />
+        <Spinner
+            android:id="@+id/spDockPosition"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:entries="@array/dock_position_entries" />
+
+        <!-- Sidebar customization -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Sidebar Icon Size"
+            android:paddingTop="12dp" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <SeekBar
+                android:id="@+id/sbSidebarIconSize"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content" />
+                
+            <TextView
+                android:id="@+id/tvSidebarIconSizeValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Medium"
+                android:paddingStart="8dp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Sidebar Length"
+            android:paddingTop="12dp" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <SeekBar
+                android:id="@+id/sbSidebarLength"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content" />
+            <TextView
+                android:id="@+id/tvSidebarLengthValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="12"
+                android:paddingStart="8dp" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnManageSidebarApps"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Manage Sidebar Apps" />
+
+        <!-- Home and Folder grid columns -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Home Grid Columns"
+            android:paddingTop="12dp" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <SeekBar
+                android:id="@+id/sbHomeColumns"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content" />
+            <TextView
+                android:id="@+id/tvHomeColumnsValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="4"
+                android:paddingStart="8dp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Folder Grid Columns"
+            android:paddingTop="12dp" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <SeekBar
+                android:id="@+id/sbFolderColumns"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content" />
+            <TextView
+                android:id="@+id/tvFolderColumnsValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="4"
+                android:paddingStart="8dp" />
+        </LinearLayout>
+
+        <!-- Clock toggle -->
+        <Switch
+            android:id="@+id/swShowClock"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Show Clock on Home" />
+
+        <!-- Competitive Features Section -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Advanced Features"
+            android:textStyle="bold"
+            android:textSize="18sp"
+            android:paddingTop="24dp"
+            android:paddingBottom="12dp" />
+
+        <Button
+            android:id="@+id/btnIconPacks"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Icon Packs"
+            android:layout_marginBottom="8dp" />
+
+        <Button
+            android:id="@+id/btnGestures"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Gesture Settings"
+            android:layout_marginBottom="8dp" />
+
+        <Button
+            android:id="@+id/btnPrivacy"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="App Privacy"
+            android:layout_marginBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+
+            <Button
+                android:id="@+id/btnBackup"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Create Backup"
+                android:layout_marginEnd="4dp" />
+
+            <Button
+                android:id="@+id/btnRestore"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Restore Backup"
+                android:layout_marginStart="4dp" />
+
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnDone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Done"
+            android:layout_marginTop="16dp" />
+
+    </LinearLayout>
+</ScrollView>

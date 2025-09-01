@@ -1,0 +1,135 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'kotlin-parcelize'
+    id 'org.jetbrains.kotlin.plugin.serialization'
+    id 'kotlin-kapt'
+}
+
+android {
+    // Namespace is now set in the module-level build.gradle file
+    namespace = 'com.sevenk.launcher' // This is the correct way to set namespace in modern Android projects
+    compileSdk = 34
+
+    defaultConfig {
+        applicationId = "com.sevenk.launcher"
+        minSdk = 26
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0"
+        
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables.useSupportLibrary = true
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled = true
+            shrinkResources = true
+            proguardFiles(getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro')
+        }
+        
+        debug {
+            applicationIdSuffix = ".debug"
+            debuggable = true
+        }
+    }
+    
+    buildFeatures {
+        viewBinding = true
+    }
+    
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    
+    kotlinOptions {
+        jvmTarget = '17'
+        freeCompilerArgs += [
+            "-Xjvm-default=all",
+        ]
+    }
+    
+    packagingOptions {
+        resources {
+            excludes += ['META-INF/AL2.0', 'META-INF/LGPL2.1']
+        }
+    }
+}
+
+dependencies {
+    // Core KTX
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    // Material Components (includes Material 3 widgets)
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    
+    // RecyclerView
+    implementation 'androidx.recyclerview:recyclerview:1.3.2'
+    // ViewPager2
+    implementation 'androidx.viewpager2:viewpager2:1.1.0'
+    
+    // Lifecycle components
+    def lifecycle_version = "2.7.0"
+    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycle_version"
+    implementation "androidx.lifecycle:lifecycle-livedata-ktx:$lifecycle_version"
+    implementation "androidx.lifecycle:lifecycle-runtime-ktx:$lifecycle_version"
+    implementation "androidx.lifecycle:lifecycle-common-java8:$lifecycle_version"
+    implementation "androidx.fragment:fragment-ktx:1.6.2"
+    implementation "androidx.activity:activity-ktx:1.8.2"
+    
+    // Coroutines
+    def coroutines_version = '1.7.3'
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:$coroutines_version"
+    
+    // Splash Screen
+    implementation 'androidx.core:core-splashscreen:1.0.1'
+    
+    // Tracing for performance profiling
+    implementation 'androidx.tracing:tracing-ktx:1.1.0'
+    implementation 'androidx.tracing:tracing:1.1.0'
+    
+    // Biometric authentication
+    implementation 'androidx.biometric:biometric:1.1.0'
+    
+    // Kotlinx Serialization for backup/restore
+    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0'
+    
+    // WebView
+    implementation 'androidx.webkit:webkit:1.8.0'
+
+    // Room for database
+    def room_version = "2.6.1"
+    implementation "androidx.room:room-runtime:$room_version"
+    implementation "androidx.room:room-ktx:$room_version"
+    kapt "androidx.room:room-compiler:$room_version"
+
+    // Image loading (Coil) - for icon packs and efficient image loading
+    implementation 'io.coil-kt:coil:2.5.0'
+
+    // Palette - for extracting colors from wallpapers
+    implementation 'androidx.palette:palette-ktx:1.0.0'
+
+    // WorkManager - for scheduled backups
+    implementation 'androidx.work:work-runtime-ktx:2.9.0'
+
+    // Animations - using standard Android animations
+    implementation 'androidx.dynamicanimation:dynamicanimation:1.0.0'
+    implementation 'androidx.transition:transition-ktx:1.4.1'
+
+    // Dynamic Colors - for Material You theming
+    implementation 'com.google.android.material:material:1.11.0'
+
+    // Testing
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+
+    // Internal apps
+    implementation project(':calcvault')
+
+    // Image cropper (uCrop)
+    implementation 'com.github.yalantis:ucrop:2.2.8'
+}

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">7K Launcher</string>
+    <string name="app_short_name">7K Launcher</string>
+    
+    <!-- Browser UI strings -->
+    <string name="home">Home</string>
+    <string name="tabs">Tabs</string>
+    <string name="bookmarks">Bookmarks</string>
+    <string name="downloads">Downloads</string>
+    <string name="menu">Menu</string>
+    <string name="favicon">Favicon</string>
+    <string name="close_tab">Close tab</string>
+    <string name="new_incognito_tab">New Incognito Tab</string>
+    <string name="desktop_site">Desktop site</string>
+    <string name="settings">Settings</string>
+    <string name="share">Share</string>
+    <string name="delete_todo_item">Delete to-do item</string>
+
+    <!-- Icon Pack Selection strings -->
+    <string name="no_icon_packs_found">No icon packs found on your device</string>
+    <string name="icon_pack_preview">Icon pack preview</string>
+    <string name="select_icon_pack">Select Icon Pack</string>
+    <string name="system_icons">System Icons</string>
+    <string name="error_loading_icon_packs">Error loading icon packs</string>
+    <string name="error_applying_icon_pack">Error applying icon pack</string>
+    <string name="using_system_icons">Using system icons</string>
+    <string name="icon_pack_applied">%1$s icon pack applied</string>
+</resources>
