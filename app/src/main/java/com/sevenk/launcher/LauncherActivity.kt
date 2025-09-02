@@ -2411,7 +2411,8 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
             // 7K Browser
             if (app.packageName == "com.sevenk.browser") {
                 try {
-                    val intent = Intent(this, Class.forName("com.sevenk.browser.BrowserActivity"))
+                    // Use direct reference to avoid reflection issues with minify/ProGuard
+                    val intent = Intent(this, com.sevenk.browser.BrowserActivity::class.java)
                     startActivity(intent)
                     recordRecent("com.sevenk.browser")
                 } catch (e: Exception) {

@@ -5,6 +5,7 @@ import android.app.DownloadManager
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -26,6 +27,10 @@ import com.sevenk.browser.privacy.PrivacyManager
 import com.google.android.material.color.MaterialColors
 import android.view.KeyEvent
 import com.sevenk.browser.model.Tab
+import android.widget.Toast
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 
 class BrowserActivity : AppCompatActivity() {
 
@@ -148,6 +153,11 @@ class BrowserActivity : AppCompatActivity() {
         
         // Set up window flags for fullscreen and transparent system bars
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        try {
+            window.statusBarColor = Color.TRANSPARENT
+            window.navigationBarColor = Color.TRANSPARENT
+        } catch (_: Throwable) {}
+        applyGlassUi()
         
         // Initialize managers
         privacyManager = PrivacyManager(this)
@@ -199,6 +209,53 @@ class BrowserActivity : AppCompatActivity() {
         if (binding.toolbar.menu.size() > 0) {
             binding.toolbar.menu.findItem(R.id.action_desktop_site)?.isChecked = isDesktopMode
         }
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        // Toolbar already has app:menu, but inflate defensively for ActionBar consistency
+        if (menu.size() == 0) menuInflater.inflate(R.menu.browser_menu, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.action_share -> {
+                val url = currentTab?.url.orEmpty()
+                if (url.isNotBlank()) {
+                    val share = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, url)
+                    }
+                    return try { startActivity(Intent.createChooser(share, getString(R.string.share))); true } catch (_: Throwable) { false }
+                }
+            }
+            R.id.action_find_in_page -> {
+                showSnackbar("Find in page coming soon")
+                return true
+            }
+            R.id.action_desktop_site -> {
+                isDesktopMode = !isDesktopMode
+                item.isChecked = isDesktopMode
+                currentWebView?.settings?.userAgentString = if (isDesktopMode) {
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                } else null
+                currentWebView?.reload()
+                return true
+            }
+            R.id.action_add_to_home -> {
+                showSnackbar("Add to Home screen coming soon")
+                return true
+            }
+            R.id.action_settings -> {
+                showSnackbar("Browser settings coming soon")
+                return true
+            }
+            R.id.action_help -> {
+                showSnackbar("Help & feedback coming soon")
+                return true
+            }
+        }
+        return super.onOptionsItemSelected(item)
     }
 
     private fun setupUrlBar() {
@@ -471,15 +528,16 @@ class BrowserActivity : AppCompatActivity() {
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
             settings.apply {
-                javaScriptEnabled = true
-                domStorageEnabled = true
-                databaseEnabled = true
+                // Privacy-first defaults
+                javaScriptEnabled = false // Off by default; can be enabled later via settings
+                domStorageEnabled = false
+                databaseEnabled = false
                 useWideViewPort = true
                 loadWithOverviewMode = true
                 setSupportZoom(true)
                 builtInZoomControls = true
                 displayZoomControls = false
-                cacheMode = if (isIncognitoMode) WebSettings.LOAD_NO_CACHE else WebSettings.LOAD_DEFAULT
+                cacheMode = WebSettings.LOAD_NO_CACHE
                 mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                 allowFileAccess = false
                 allowFileAccessFromFileURLs = false
@@ -488,6 +546,7 @@ class BrowserActivity : AppCompatActivity() {
                 userAgentString = if (isDesktopMode) {
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
                 } else null
+                setSupportMultipleWindows(false)
             }
             webViewClient = this@BrowserActivity.webViewClient
             webChromeClient = this@BrowserActivity.webChromeClient
@@ -495,9 +554,13 @@ class BrowserActivity : AppCompatActivity() {
                 handleDownload(url, userAgent, contentDisposition, mimeType)
             }
             try {
-                CookieManager.getInstance().setAcceptThirdPartyCookies(this, !isIncognitoMode)
-                if (isIncognitoMode) CookieManager.getInstance().setAcceptCookie(false)
+                // Restrictive cookies by default
+                CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
+                CookieManager.getInstance().setAcceptCookie(!isIncognitoMode)
             } catch (_: Throwable) {}
+            // Extra safety: do not retain form data/history by default
+            try { clearFormData() } catch (_: Throwable) {}
+            try { clearHistory() } catch (_: Throwable) {}
         }
     }
 
@@ -519,6 +582,38 @@ class BrowserActivity : AppCompatActivity() {
             try { CookieManager.getInstance().removeAllCookies(null); CookieManager.getInstance().flush() } catch (_: Throwable) {}
             try { WebStorage.getInstance().deleteAllData() } catch (_: Throwable) {}
         }
+    }
+
+    // --- Glass UI helpers ---
+    private fun applyGlassUi() {
+        try {
+            val toolbar = binding.toolbar
+            val bottom = binding.bottomNavigation
+            val surface = MaterialColors.getColor(toolbar, com.google.android.material.R.attr.colorSurface)
+            val onSurface = MaterialColors.getColor(toolbar, com.google.android.material.R.attr.colorOnSurface)
+            // Translucent backgrounds
+            val translucent = with(Color.valueOf(surface)) {
+                Color.argb((0.75f * 255).toInt(), (red() * 255).toInt(), (green() * 255).toInt(), (blue() * 255).toInt())
+            }
+            toolbar.setBackgroundColor(translucent)
+            bottom.setBackgroundColor(translucent)
+
+            if (Build.VERSION.SDK_INT >= 31) {
+                try {
+                    val blur = android.graphics.RenderEffect.createBlurEffect(24f, 24f, android.graphics.Shader.TileMode.CLAMP)
+                    toolbar.setRenderEffect(blur)
+                    bottom.setRenderEffect(blur)
+                } catch (_: Throwable) {}
+            }
+
+            // Handle insets so content isn't obscured
+            ViewCompat.setOnApplyWindowInsetsListener(binding.root) { v, insets ->
+                val sys = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+                toolbar.setPadding(toolbar.paddingLeft, sys.top, toolbar.paddingRight, toolbar.paddingBottom)
+                bottom.setPadding(bottom.paddingLeft, bottom.paddingTop, bottom.paddingRight, sys.bottom)
+                WindowInsetsCompat.CONSUMED
+            }
+        } catch (_: Throwable) { /* never crash UI theming */ }
     }
 
     
