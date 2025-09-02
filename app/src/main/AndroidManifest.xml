@@ -45,7 +45,7 @@
             android:exported="true"
             android:label="7K Browser"
             android:icon="@mipmap/ic_launcher_browser"
-            android:theme="@style/Theme.SevenKLauncher">
+            android:theme="@style/Theme.SevenK.Browser">
             <!-- No MAIN/LAUNCHER intent filter - launched internally from launcher -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -82,6 +82,27 @@
             android:label="7K Settings"
             android:icon="@drawable/ic_settings_7k">
         </activity>
+
+        <!-- Icon Pack Selection -->
+        <activity
+            android:name=".IconPackSelectionActivity"
+            android:exported="false"
+            android:label="Icon Packs"
+            android:theme="@style/Theme.SevenKLauncher" />
+
+        <!-- Gesture Settings -->
+        <activity
+            android:name=".GestureSettingsActivity"
+            android:exported="false"
+            android:label="Gestures"
+            android:theme="@style/Theme.SevenKLauncher" />
+
+        <!-- App Privacy Settings -->
+        <activity
+            android:name=".AppPrivacyActivity"
+            android:exported="false"
+            android:label="Privacy"
+            android:theme="@style/Theme.SevenKLauncher" />
 
         <receiver
             android:name=".AppWidget"
@@ -152,6 +173,13 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- uCrop activity (image cropper) -->
+        <activity
+            android:name="com.yalantis.ucrop.UCropActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
 
     </application>
 </manifest>
