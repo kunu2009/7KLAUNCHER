@@ -67,6 +67,9 @@ class LauncherActivity : AppCompatActivity() {
     private lateinit var appWidgetHost: AppWidgetHost
     private lateinit var appWidgetManager: AppWidgetManager
     private val prefs by lazy { getSharedPreferences("sevenk_launcher_prefs", MODE_PRIVATE) }
+    // Controls for runtime blur compatibility
+    private var blurFailureCount = 0
+
 
     // Add a getter method to expose the app list to fragments/adapters
     fun getAppList(): List<AppInfo> = appList
@@ -118,11 +121,34 @@ class LauncherActivity : AppCompatActivity() {
 
     private fun applyGlassBlurIfPossible(view: View?, radius: Float) {
         if (view == null) return
+        // Respect device capability and user preference
+        if (!shouldUseRuntimeBlur()) {
+            // Ensure any previous blur is cleared
+            if (Build.VERSION.SDK_INT >= 31) try { view.setRenderEffect(null) } catch (_: Throwable) {}
+            return
+        }
         if (Build.VERSION.SDK_INT < 31) return
         try {
             val renderEffect = android.graphics.RenderEffect.createBlurEffect(radius, radius, android.graphics.Shader.TileMode.CLAMP)
             view.setRenderEffect(renderEffect)
-        } catch (_: Throwable) {}
+        } catch (_: Throwable) {
+            // Auto-disable if this device has issues applying blur
+            blurFailureCount++
+            if (blurFailureCount >= 2) {
+                try { prefs.edit().putBoolean("enable_runtime_blur", false).apply() } catch (_: Throwable) {}
+            }
+        }
+    }
+
+    private fun shouldUseRuntimeBlur(): Boolean {
+        return try {
+            if (Build.VERSION.SDK_INT < 31) return false
+            val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+            if (am.isLowRamDevice) return false
+            prefs.getBoolean("enable_runtime_blur", true)
+        } catch (_: Throwable) {
+            false
+        }
     }
 
     // Expose icon pack helper to fragments/adapters
@@ -1335,13 +1361,26 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
     }
 
     private fun initBlurPanels() {
+        if (!shouldUseRuntimeBlur()) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                try {
+                    dock.setRenderEffect(null)
+                    sidebar.setRenderEffect(null)
+                } catch (_: Throwable) {}
+            }
+            return
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             try {
                 val blur = RenderEffect.createBlurEffect(12f, 12f, Shader.TileMode.CLAMP)
                 dock.setRenderEffect(blur)
                 sidebar.setRenderEffect(blur)
             } catch (_: Throwable) {
-                // Fallback: keep dim rounded panels only
+                // Fallback: disable blur for this device if it fails repeatedly
+                blurFailureCount++
+                if (blurFailureCount >= 2) {
+                    try { prefs.edit().putBoolean("enable_runtime_blur", false).apply() } catch (_: Throwable) {}
+                }
             }
         }
     }

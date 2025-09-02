@@ -528,10 +528,10 @@ class BrowserActivity : AppCompatActivity() {
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
             settings.apply {
-                // Privacy-first defaults
-                javaScriptEnabled = false // Off by default; can be enabled later via settings
-                domStorageEnabled = false
-                databaseEnabled = false
+                // Defaults tuned for usability (with planned settings toggle)
+                javaScriptEnabled = true
+                domStorageEnabled = true
+                databaseEnabled = true
                 useWideViewPort = true
                 loadWithOverviewMode = true
                 setSupportZoom(true)
