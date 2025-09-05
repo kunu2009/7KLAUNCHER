@@ -8,6 +8,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
+import android.content.SharedPreferences
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -18,6 +19,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.tabs.TabLayout
 import com.sevenk.launcher.AppInfo
 import com.sevenk.launcher.LauncherActivity
+import androidx.preference.PreferenceManager
 import com.sevenk.launcher.R
 import com.sevenk.launcher.util.Perf
 import kotlinx.coroutines.launch
@@ -33,8 +35,39 @@ class AppDrawerFragment : Fragment() {
     private lateinit var emptyStateView: LinearLayout
     private lateinit var categoryTabs: TabLayout
     private lateinit var searchBarContainer: View
-
+    
+    private val prefs by lazy { PreferenceManager.getDefaultSharedPreferences(requireContext()) }
     private var allApps: List<AppInfo> = emptyList()
+    
+    // Preference change listener
+    private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        when (key) {
+            "drawer_sort_order", "drawer_alphabet_headers" -> {
+                // Update adapter with new preferences
+                updateAdapterPreferences()
+                
+                // If we're currently searching, reapply the filter to maintain search results
+                val query = searchEditText.text?.toString()
+                if (!query.isNullOrEmpty()) {
+                    adapter.filter.filter(query)
+                }
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Register preference change listener
+        prefs.registerOnSharedPreferenceChangeListener(prefsListener)
+        // Ensure adapter is up to date with current preferences
+        updateAdapterPreferences()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Unregister preference change listener
+        prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -55,7 +88,7 @@ class AppDrawerFragment : Fragment() {
         val columnCount = resources.getInteger(R.integer.app_drawer_columns)
         recyclerView.layoutManager = GridLayoutManager(context, columnCount)
 
-        // Set up the adapter
+        // Set up the adapter with initial preferences
         adapter = AppDrawerAdapter(
             requireContext(),
             viewLifecycleOwner.lifecycleScope,
@@ -69,6 +102,9 @@ class AppDrawerFragment : Fragment() {
                 true
             }
         )
+        
+        // Apply current preferences
+        updateAdapterPreferences()
         recyclerView.adapter = adapter
 
         // Set up search functionality
@@ -80,6 +116,38 @@ class AppDrawerFragment : Fragment() {
         return view
     }
 
+    /**
+     * Updates the adapter with current preferences
+     */
+    private fun updateAdapterPreferences() {
+        if (!::adapter.isInitialized) return
+        
+        // Get current preferences
+        val sortOrder = prefs.getString("drawer_sort_order", "az") ?: "az"
+        val showAlphabetHeaders = prefs.getBoolean("drawer_alphabet_headers", true)
+        
+        // Update adapter
+        adapter.setSortOrder(sortOrder)
+        adapter.setShowAlphabetHeaders(showAlphabetHeaders)
+        
+        // If we already have apps, update them to apply new sorting
+        if (allApps.isNotEmpty()) {
+            adapter.updateApps(allApps)
+            
+            // Update category tabs to reflect any changes
+            updateCategoryTabs()
+        }
+    }
+    
+    /**
+     * Refreshes the app drawer with the current list of apps
+     */
+    fun refreshAppDrawer() {
+        if (allApps.isNotEmpty()) {
+            updateApps(allApps)
+        }
+    }
+    
     /**
      * Updates the fragment with the provided list of apps
      */

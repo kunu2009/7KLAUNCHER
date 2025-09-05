@@ -2,5 +2,7 @@
 <resources>
     <!-- App drawer column count -->
     <integer name="app_drawer_columns">4</integer>
+    <!-- Notes grid columns -->
+    <integer name="notes_grid_columns">2</integer>
 </resources>
 

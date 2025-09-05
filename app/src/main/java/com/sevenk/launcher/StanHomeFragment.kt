@@ -90,9 +90,20 @@ class StanHomeFragment : Fragment() {
             }
         }
 
+        // Apply subtle runtime blur only when supported and enabled.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            try { chatBar?.setRenderEffect(RenderEffect.createBlurEffect(20f, 20f, Shader.TileMode.CLAMP)) } catch (_: Throwable) {}
-            try { chatList.setRenderEffect(RenderEffect.createBlurEffect(12f, 12f, Shader.TileMode.CLAMP)) } catch (_: Throwable) {}
+            try {
+                val prefs = requireContext().getSharedPreferences("sevenk_launcher_prefs", Context.MODE_PRIVATE)
+                val am = requireContext().getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                val enableRuntimeBlur = !am.isLowRamDevice && prefs.getBoolean("enable_runtime_blur", true)
+                if (enableRuntimeBlur) {
+                    try { chatBar?.setRenderEffect(RenderEffect.createBlurEffect(16f, 16f, Shader.TileMode.CLAMP)) } catch (_: Throwable) {}
+                } else {
+                    try { chatBar?.setRenderEffect(null) } catch (_: Throwable) {}
+                }
+                // Do NOT blur the full-screen list; this caused entire home to appear blurred on some devices
+                try { chatList.setRenderEffect(null) } catch (_: Throwable) {}
+            } catch (_: Throwable) { /* never crash due to blur effects */ }
         }
 
         chatSend.setOnClickListener { submit() }

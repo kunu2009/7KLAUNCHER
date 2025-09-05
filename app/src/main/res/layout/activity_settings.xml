@@ -17,6 +17,16 @@
             android:textSize="20sp"
             android:paddingBottom="12dp" />
 
+        <!-- Section: General -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_section_general"
+            android:textStyle="bold"
+            android:textSize="18sp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp" />
+
         <Switch
             android:id="@+id/swShowDock"
             android:layout_width="match_parent"
@@ -53,6 +63,56 @@
             android:layout_height="wrap_content"
             android:text="Launcher Power Saver" />
 
+        <!-- General: Theme & Labels -->
+        <Switch
+            android:id="@+id/swDynamicColor"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/dynamic_color" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/accent_color"
+            android:paddingTop="12dp" />
+        <Spinner
+            android:id="@+id/spAccentColor"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:entries="@array/accent_color_names" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/label_lines"
+            android:paddingTop="12dp" />
+        <Spinner
+            android:id="@+id/spLabelLines"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:entries="@array/label_lines_entries" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/label_font_size"
+            android:paddingTop="12dp" />
+        <Spinner
+            android:id="@+id/spLabelFontSize"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:entries="@array/label_font_size_entries" />
+
+        <!-- Section: App Drawer -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_section_drawer"
+            android:textStyle="bold"
+            android:textSize="18sp"
+            android:paddingTop="24dp"
+            android:paddingBottom="8dp" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -79,6 +139,24 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:text="@string/drawer_sort_order"
+            android:paddingTop="12dp" />
+        <Spinner
+            android:id="@+id/spDrawerSortOrder"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:entries="@array/drawer_sort_order_entries" />
+
+        <Switch
+            android:id="@+id/swDrawerAlphabetHeaders"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/drawer_alphabet_headers"
+            android:paddingTop="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:text="Icon Size"
             android:paddingTop="12dp" />
         <LinearLayout
@@ -98,6 +176,16 @@
                 android:text="Medium"
                 android:paddingStart="8dp" />
         </LinearLayout>
+
+        <!-- Section: Dock -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_section_dock"
+            android:textStyle="bold"
+            android:textSize="18sp"
+            android:paddingTop="24dp"
+            android:paddingBottom="8dp" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -162,7 +250,40 @@
             android:layout_height="wrap_content"
             android:entries="@array/dock_position_entries" />
 
-        <!-- Sidebar customization -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/dock_opacity"
+            android:paddingTop="12dp" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <SeekBar
+                android:id="@+id/sbDockOpacity"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:max="100" />
+            <TextView
+                android:id="@+id/tvDockOpacityValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="100%"
+                android:paddingStart="8dp" />
+        </LinearLayout>
+
+        <!-- Section: Sidebar -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_section_sidebar"
+            android:textStyle="bold"
+            android:textSize="18sp"
+            android:paddingTop="24dp"
+            android:paddingBottom="8dp" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -216,7 +337,16 @@
             android:layout_height="wrap_content"
             android:text="Manage Sidebar Apps" />
 
-        <!-- Home and Folder grid columns -->
+        <!-- Section: Home & Folders -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_section_home"
+            android:textStyle="bold"
+            android:textSize="18sp"
+            android:paddingTop="24dp"
+            android:paddingBottom="8dp" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -270,11 +400,23 @@
             android:layout_height="wrap_content"
             android:text="Show Clock on Home" />
 
+        <Switch
+            android:id="@+id/swPageDots"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/page_indicator_dots" />
+
+        <Switch
+            android:id="@+id/swParallax"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/wallpaper_parallax" />
+
         <!-- Competitive Features Section -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Advanced Features"
+            android:text="@string/settings_section_advanced"
             android:textStyle="bold"
             android:textSize="18sp"
             android:paddingTop="24dp"
@@ -323,6 +465,123 @@
                 android:text="Restore Backup"
                 android:layout_marginStart="4dp" />
 
+        </LinearLayout>
+
+        <!-- Search sources -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/search_sources"
+            android:paddingTop="12dp" />
+        <Switch
+            android:id="@+id/swSearchApps"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/search_apps" />
+        <Switch
+            android:id="@+id/swSearchContacts"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/search_contacts" />
+        <Switch
+            android:id="@+id/swSearchWeb"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/search_web" />
+
+        <!-- Hidden apps manager and auto-clear cache threshold -->
+        <Button
+            android:id="@+id/btnManageHiddenApps"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Manage Hidden Apps"
+            android:layout_marginTop="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Auto clear cache"
+            android:paddingTop="12dp" />
+        <Spinner
+            android:id="@+id/spAutoClearCache"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:entries="@array/auto_clear_cache_entries" />
+
+        <!-- Section: Wallpaper -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_section_wallpaper"
+            android:textStyle="bold"
+            android:textSize="18sp"
+            android:paddingTop="24dp"
+            android:paddingBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+            <Button
+                android:id="@+id/btnWallpaperGallery"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/choose_from_gallery"
+                android:layout_marginEnd="4dp" />
+            <Button
+                android:id="@+id/btnWallpaperPreloaded"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/choose_preloaded"
+                android:layout_marginStart="4dp" />
+        </LinearLayout>
+
+        <!-- Section: Storage -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_section_storage"
+            android:textStyle="bold"
+            android:textSize="18sp"
+            android:paddingTop="24dp"
+            android:paddingBottom="8dp" />
+
+        <TextView
+            android:id="@+id/tvStorageSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:paddingBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button
+                android:id="@+id/btnClearCache"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/clear_cache"
+                android:layout_marginEnd="4dp" />
+            <Button
+                android:id="@+id/btnClearWebData"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/clear_web_data"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp" />
+            <Button
+                android:id="@+id/btnClearTemp"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/clear_temp_files"
+                android:layout_marginStart="4dp" />
         </LinearLayout>
 
         <Button

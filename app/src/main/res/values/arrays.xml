@@ -5,4 +5,52 @@
         <item>Center</item>
         <item>Right</item>
     </string-array>
+
+    <string-array name="label_lines_entries">
+        <item>1 line</item>
+        <item>2 lines</item>
+    </string-array>
+
+    <string-array name="label_font_size_entries">
+        <item>Small</item>
+        <item>Medium</item>
+        <item>Large</item>
+    </string-array>
+
+    <string-array name="drawer_sort_order_entries">
+        <item>A → Z</item>
+        <item>Most used</item>
+        <item>Recently used</item>
+    </string-array>
+
+    <string-array name="accent_color_names">
+        <item>System</item>
+        <item>Blue</item>
+        <item>Green</item>
+        <item>Purple</item>
+        <item>Orange</item>
+        <item>Red</item>
+    </string-array>
+
+    <string-array name="accent_color_values">
+        <item>SYSTEM</item>
+        <item>#2962FF</item>
+        <item>#2E7D32</item>
+        <item>#673AB7</item>
+        <item>#F57C00</item>
+        <item>#D32F2F</item>
+    </string-array>
+
+    <string-array name="auto_clear_cache_entries">
+        <item>Never</item>
+        <item>When > 25 MB</item>
+        <item>When > 50 MB</item>
+        <item>When > 100 MB</item>
+    </string-array>
+    <integer-array name="auto_clear_cache_values_mb">
+        <item>0</item>
+        <item>25</item>
+        <item>50</item>
+        <item>100</item>
+    </integer-array>
 </resources>

@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.provider.MediaStore
+import android.provider.DocumentsContract
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -80,6 +81,17 @@ class VaultActivity : AppCompatActivity() {
                         } catch (_: Throwable) {}
                     }
                 }
+            } else {
+                // API 28 and below: try DocumentsContract delete, then fallback delete
+                for (u in uris) {
+                    var deleted = false
+                    try {
+                        deleted = DocumentsContract.deleteDocument(contentResolver, u)
+                    } catch (_: Throwable) {}
+                    if (!deleted) {
+                        try { contentResolver.delete(u, null, null) } catch (_: Throwable) {}
+                    }
+                }
             }
         } catch (_: Throwable) { }
     }
@@ -90,6 +102,9 @@ class VaultActivity : AppCompatActivity() {
             type = "image/*"
             putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/*"))
             putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
         }
         startActivityForResult(intent, REQ_PICK_MEDIA)
     }
@@ -167,6 +182,16 @@ class VaultActivity : AppCompatActivity() {
     }
 
     private fun onVaultItemClicked(file: File) {
-        // This is a simplified preview. A real app would need a more robust solution.
+        // Build current list (sorted like adapter) and open preview at tapped index
+        val files = if (vaultDir.exists()) vaultDir.listFiles()?.toList().orEmpty() else emptyList()
+        val sorted = files.sortedByDescending { it.lastModified() }
+        val idx = sorted.indexOfFirst { it.absolutePath == file.absolutePath }.coerceAtLeast(0)
+        val arr = ArrayList<String>(sorted.size)
+        for (f in sorted) arr.add(f.absolutePath)
+        val intent = Intent(this, VaultPreviewActivity::class.java).apply {
+            putStringArrayListExtra("files", arr)
+            putExtra("index", idx)
+        }
+        startActivity(intent)
     }
 }

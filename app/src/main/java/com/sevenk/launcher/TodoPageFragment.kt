@@ -47,11 +47,11 @@ class TodoPageFragment : Fragment() {
             adapter.submitList(it)
         }
 
-        // Apply subtle runtime blur to reinforce translucent glass on Android 12+
+        // Do NOT blur the full-screen RecyclerView; it can make the whole home look blurred on some devices.
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
             try {
-                val effect = android.graphics.RenderEffect.createBlurEffect(12f, 12f, android.graphics.Shader.TileMode.CLAMP)
-                binding.todoRecycler.setRenderEffect(effect)
+                // Explicitly clear any blur if previously applied
+                binding.todoRecycler.setRenderEffect(null)
             } catch (_: Throwable) { }
         }
     }

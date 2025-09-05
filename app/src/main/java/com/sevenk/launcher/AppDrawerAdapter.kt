@@ -3,6 +3,7 @@ package com.sevenk.launcher
 import android.content.ClipData
 import android.content.ClipDescription
 import android.content.Context
+import android.view.HapticFeedbackConstants
 import android.os.Build
 import android.view.LayoutInflater
 import android.view.View
@@ -177,6 +178,8 @@ class AppDrawerAdapter(
             override fun onLongPress(e: android.view.MotionEvent) {
                 longPressed = true
                 downX = e.x; downY = e.y
+                // Provide haptic feedback, and defer action decision to ACTION_UP vs MOVE
+                try { holder.itemView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS) } catch (_: Throwable) {}
             }
         })
         holder.itemView.setOnTouchListener { v, ev ->
@@ -200,6 +203,13 @@ class AppDrawerAdapter(
                     }
                 }
                 android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                    // If we long-pressed but did not begin dragging, treat as context menu request
+                    if (longPressed && !startedDrag) {
+                        onItemLongPress?.invoke(app)
+                        longPressed = false
+                        startedDrag = false
+                        return@setOnTouchListener true
+                    }
                     longPressed = false
                     startedDrag = false
                 }

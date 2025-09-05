@@ -10,7 +10,7 @@ import android.util.LruCache
 object IconCache {
     private val cache: LruCache<String, Bitmap> by lazy {
         val maxMem = (Runtime.getRuntime().maxMemory() / 1024).toInt()
-        val cacheSize = maxMem / 8 // use 1/8 of available memory
+        val cacheSize = maxMem / 10 // be conservative: use ~10% of available memory
         object : LruCache<String, Bitmap>(cacheSize) {
             override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount / 1024
         }
@@ -86,6 +86,10 @@ object IconCache {
             // As a pragmatic approach, clear entire cache for reliability when a custom icon changes.
         }
         // Full clear to ensure UI refresh of icons everywhere
+        cache.evictAll()
+    }
+
+    fun clearAll() {
         cache.evictAll()
     }
 }

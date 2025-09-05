@@ -5,7 +5,9 @@
         android:allowBackup="true"
         android:label="Calculator"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Material3.DayNight.NoActionBar">
+        android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round">
 
         <activity
             android:name=".VaultActivity"
@@ -35,6 +37,11 @@
                 <data android:mimeType="video/*" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".VaultPreviewActivity"
+            android:exported="false"
+            android:label="Preview" />
 
     </application>
 </manifest>

@@ -1,6 +1,7 @@
 package com.sevenk.calcvault.security
 
 import android.content.Context
+import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
@@ -37,11 +38,21 @@ class BiometricAuthManager(
                 }
             })
 
-        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+        val builder = BiometricPrompt.PromptInfo.Builder()
             .setTitle("Unlock Calc Vault")
             .setSubtitle("Confirm your identity to proceed")
-            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
-            .build()
+
+        val promptInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // API 30+: allowed to combine BIOMETRIC_STRONG and DEVICE_CREDENTIAL
+            builder.setAllowedAuthenticators(
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                        BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            ).build()
+        } else {
+            // API 29: must use deprecated setDeviceCredentialAllowed(true)
+            @Suppress("DEPRECATION")
+            builder.setDeviceCredentialAllowed(true).build()
+        }
 
         biometricPrompt.authenticate(promptInfo)
     }

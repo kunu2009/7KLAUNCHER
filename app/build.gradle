@@ -56,6 +56,19 @@ android {
             excludes += ['META-INF/AL2.0', 'META-INF/LGPL2.1']
         }
     }
+
+    // Generate device-targeted APKs to reduce install size
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+            universalApk false
+        }
+        density {
+            enable true
+        }
+    }
 }
 
 dependencies {

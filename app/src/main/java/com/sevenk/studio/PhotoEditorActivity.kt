@@ -31,6 +31,7 @@ class PhotoEditorActivity : AppCompatActivity() {
     private var currentBitmap: Bitmap? = null
     private var brightnessProgress: Int = 100 // 0..200, default 100
     private var contrastProgress: Int = 100 // 0..200, default 100
+    private var saturationProgress: Int = 100 // 0..200, default 100
     private var currentFilter: Filter = Filter.NONE
 
     private enum class Filter { NONE, WARM, COOL, BW, VIVID }
@@ -222,13 +223,16 @@ class PhotoEditorActivity : AppCompatActivity() {
     private fun setupAdjustmentsUI() {
         val seekB: android.widget.SeekBar? = try { binding.root.findViewById(R.id.seekBrightness) } catch (_: Throwable) { null }
         val seekC: android.widget.SeekBar? = try { binding.root.findViewById(R.id.seekContrast) } catch (_: Throwable) { null }
+        val seekS: android.widget.SeekBar? = try { binding.root.findViewById(R.id.seekSaturation) } catch (_: Throwable) { null }
         seekB?.progress = brightnessProgress
         seekC?.progress = contrastProgress
+        seekS?.progress = saturationProgress
         val listener = object : android.widget.SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
                 when (sb?.id) {
                     R.id.seekBrightness -> brightnessProgress = progress
                     R.id.seekContrast -> contrastProgress = progress
+                    R.id.seekSaturation -> saturationProgress = progress
                 }
                 renderPreview()
             }
@@ -237,6 +241,7 @@ class PhotoEditorActivity : AppCompatActivity() {
         }
         seekB?.setOnSeekBarChangeListener(listener)
         seekC?.setOnSeekBarChangeListener(listener)
+        seekS?.setOnSeekBarChangeListener(listener)
     }
 
     private fun setupFilterButtons() {
@@ -251,11 +256,14 @@ class PhotoEditorActivity : AppCompatActivity() {
     private fun resetAdjustments() {
         brightnessProgress = 100
         contrastProgress = 100
+        saturationProgress = 100
         currentFilter = Filter.NONE
         val seekB: android.widget.SeekBar? = try { binding.root.findViewById(R.id.seekBrightness) } catch (_: Throwable) { null }
         val seekC: android.widget.SeekBar? = try { binding.root.findViewById(R.id.seekContrast) } catch (_: Throwable) { null }
+        val seekS: android.widget.SeekBar? = try { binding.root.findViewById(R.id.seekSaturation) } catch (_: Throwable) { null }
         seekB?.progress = brightnessProgress
         seekC?.progress = contrastProgress
+        seekS?.progress = saturationProgress
     }
 
     private fun renderPreview() {
@@ -293,6 +301,12 @@ class PhotoEditorActivity : AppCompatActivity() {
             )
         )
         cm.postConcat(bright)
+
+        // Saturation (1f = normal). Map 0..200 -> 0..2
+        val s = saturationProgress / 100f
+        val satM = ColorMatrix()
+        satM.setSaturation(s)
+        cm.postConcat(satM)
 
         // Filter preset
         val f = when (currentFilter) {

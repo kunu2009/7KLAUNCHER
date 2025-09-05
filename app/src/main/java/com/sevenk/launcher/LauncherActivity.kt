@@ -3,6 +3,8 @@ package com.sevenk.launcher
 import android.app.WallpaperManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.LauncherApps
+import android.content.pm.ShortcutInfo
 import android.appwidget.AppWidgetHost
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
@@ -18,6 +20,7 @@ import android.view.ViewConfiguration
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.content.IntentFilter
 import android.view.inputmethod.InputMethodManager
 import android.app.ActivityManager
 import android.widget.FrameLayout
@@ -44,6 +47,9 @@ import android.content.ClipDescription
 import android.view.animation.DecelerateInterpolator
 import com.sevenk.launcher.util.Perf
 import com.sevenk.launcher.iconpack.IconPackHelper
+import com.sevenk.launcher.battery.BatteryOptimizer
+import android.os.Process
+import com.sevenk.launcher.gesture.GestureManager
 
 class LauncherActivity : AppCompatActivity() {
     private lateinit var appDrawerContainer: ViewGroup
@@ -62,17 +68,58 @@ class LauncherActivity : AppCompatActivity() {
     private lateinit var sidebarEdgeHandle: View
     private lateinit var searchBox: EditText
     private lateinit var gestureDetector: GestureDetectorCompat
+    private lateinit var gestureManager: GestureManager
     private var appList: MutableList<AppInfo> = mutableListOf()
     private lateinit var widgetsContainer: FrameLayout
     private lateinit var appWidgetHost: AppWidgetHost
     private lateinit var appWidgetManager: AppWidgetManager
     private val prefs by lazy { getSharedPreferences("sevenk_launcher_prefs", MODE_PRIVATE) }
+    
+    // Preference change listener for app drawer updates
+    private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        when (key) {
+            "drawer_sort_order", "drawer_alphabet_headers" -> {
+                // Refresh app drawer to apply new settings
+                refreshAppDrawer()
+            }
+        }
+    }
+    
     // Controls for runtime blur compatibility
     private var blurFailureCount = 0
 
 
     // Add a getter method to expose the app list to fragments/adapters
     fun getAppList(): List<AppInfo> = appList
+
+    // Package change receiver to refresh UI immediately after install/uninstall
+    private val packageChangeReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: Intent?) {
+            if (intent == null) return
+            val action = intent.action ?: return
+            val pkg = intent.data?.schemeSpecificPart ?: return
+            when (action) {
+                Intent.ACTION_PACKAGE_REMOVED -> {
+                    val replacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
+                    if (!replacing) {
+                        onPackageRemoved(pkg)
+                    }
+                }
+                Intent.ACTION_PACKAGE_ADDED -> {
+                    val replacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
+                    if (!replacing) {
+                        onPackageAdded(pkg)
+                    } else {
+                        // Update changed package as added during replace
+                        onPackageChanged(pkg)
+                    }
+                }
+                Intent.ACTION_PACKAGE_CHANGED -> {
+                    onPackageChanged(pkg)
+                }
+            }
+        }
+    }
 
     // Add GlassManager for consistent glass effects
     lateinit var glassManager: GlassManager
@@ -118,6 +165,8 @@ class LauncherActivity : AppCompatActivity() {
     private var sidebarOverlayOpen = false
     private lateinit var iconPackHelper: IconPackHelper
     private val REQ_PICK_BACKGROUND = 5012
+    private lateinit var batteryOptimizer: BatteryOptimizer
+    private var prewarmJob: kotlinx.coroutines.Job? = null
 
     private fun applyGlassBlurIfPossible(view: View?, radius: Float) {
         if (view == null) return
@@ -145,6 +194,10 @@ class LauncherActivity : AppCompatActivity() {
             if (Build.VERSION.SDK_INT < 31) return false
             val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
             if (am.isLowRamDevice) return false
+            // Disable expensive blur in device power-save or our own low-power mode
+            if (this::batteryOptimizer.isInitialized) {
+                if (batteryOptimizer.isDeviceInPowerSaveMode() || batteryOptimizer.isBatterySavingMode()) return false
+            }
             prefs.getBoolean("enable_runtime_blur", true)
         } catch (_: Throwable) {
             false
@@ -301,6 +354,11 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
     private val INTERNAL_POLYGLOT_PKG = "internal.7kpolyglot"
     private val INTERNAL_ECO_PKG = "internal.7keco"
     private val INTERNAL_LIFE_PKG = "internal.7klife"
+    // Daily Essentials synthetic apps
+    private val INTERNAL_NOTES_PKG = "internal.7knotes"
+    private val INTERNAL_CALENDAR2_PKG = "internal.7kcalendar"
+    private val INTERNAL_WEATHER_PKG = "internal.7kweather"
+    private val INTERNAL_MUSIC_PKG = "internal.7kmusic"
 
     // Folders per page (persisted) - using existing Folder class
     private val homeFolders: MutableMap<Int, MutableList<Folder>> = mutableMapOf()
@@ -318,6 +376,16 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
         val dynamic = mutableListOf<String>()
         dynamic.add("Set Custom Icon")
         if (CustomIconManager.hasCustomIcon(this@LauncherActivity, app.packageName)) dynamic.add("Remove Custom Icon")
+        // Home screen management
+        val isOnAnyHome = try {
+            val pages = getNormalHomePages()
+            (0 until pages).any { idx ->
+                try { loadHomePageList(idx).contains(app.packageName) } catch (_: Throwable) { false }
+            }
+        } catch (_: Throwable) { false }
+        if (isOnAnyHome) dynamic.add("Remove from Home") else dynamic.add("Add to Home")
+        // Surface app shortcuts if available
+        dynamic.add("Shortcuts")
         dynamic.add("Uninstall")
         dynamic.add("App Info")
         val options = dynamic.toTypedArray()
@@ -339,6 +407,28 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                             pendingCustomIconPkg = null
                         }
                     }
+                    "Shortcuts" -> {
+                        showAppShortcuts(app)
+                    }
+                    "Add to Home" -> {
+                        try {
+                            val page = try { getCurrentHomePage() } catch (_: Throwable) { 1 }
+                            addToHomePage(page, app.packageName)
+                            refreshHomePages()
+                            Toast.makeText(this, "Added to Home", Toast.LENGTH_SHORT).show()
+                        } catch (_: Throwable) {
+                            Toast.makeText(this, "Unable to add to Home", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    "Remove from Home" -> {
+                        try {
+                            removeFromAllHomePagesPublic(app.packageName)
+                            refreshHomePages()
+                            Toast.makeText(this, "Removed from Home", Toast.LENGTH_SHORT).show()
+                        } catch (_: Throwable) {
+                            Toast.makeText(this, "Unable to remove from Home", Toast.LENGTH_SHORT).show()
+                        }
+                    }
                     "Remove Custom Icon" -> {
                         val removed = CustomIconManager.removeCustomIcon(this, app.packageName)
                         if (removed) {
@@ -354,12 +444,29 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                     }
                     "Uninstall" -> {
                         try {
-                            if (app.packageName != packageName && app.packageName != INTERNAL_CALC_PKG && app.packageName != INTERNAL_STUDIO_PKG) {
+                            if (app.packageName != packageName &&
+                                app.packageName != INTERNAL_CALC_PKG &&
+                                app.packageName != INTERNAL_STUDIO_PKG &&
+                                app.packageName != INTERNAL_LAW_PKG &&
+                                app.packageName != INTERNAL_ITIHAAS_PKG &&
+                                app.packageName != INTERNAL_POLYGLOT_PKG &&
+                                app.packageName != INTERNAL_ECO_PKG &&
+                                app.packageName != INTERNAL_LIFE_PKG) {
                                 val uri = Uri.parse("package:${app.packageName}")
-                                val intent = Intent(Intent.ACTION_UNINSTALL_PACKAGE, uri).apply {
+                                // Prefer ACTION_DELETE (widely supported), fallback to ACTION_UNINSTALL_PACKAGE
+                                val delete = Intent(Intent.ACTION_DELETE, uri).apply {
                                     putExtra(Intent.EXTRA_RETURN_RESULT, true)
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 }
-                                startActivity(intent)
+                                try {
+                                    startActivity(delete)
+                                } catch (_: Throwable) {
+                                    val uninstall = Intent(Intent.ACTION_UNINSTALL_PACKAGE, uri).apply {
+                                        putExtra(Intent.EXTRA_RETURN_RESULT, true)
+                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    startActivity(uninstall)
+                                }
                             } else {
                                 Toast.makeText(this, "Cannot uninstall this app", Toast.LENGTH_SHORT).show()
                             }
@@ -379,6 +486,46 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    private fun showAppShortcuts(app: AppInfo) {
+        try {
+            val la = getSystemService(LauncherApps::class.java)
+            if (la == null) {
+                Toast.makeText(this, "Shortcuts not supported", Toast.LENGTH_SHORT).show()
+                return
+            }
+            val query = LauncherApps.ShortcutQuery()
+            query.setPackage(app.packageName)
+            // Match dynamic + pinned + manifest shortcuts
+            query.setQueryFlags(
+                LauncherApps.ShortcutQuery.FLAG_MATCH_DYNAMIC or
+                        LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED or
+                        LauncherApps.ShortcutQuery.FLAG_MATCH_MANIFEST
+            )
+            val user = Process.myUserHandle()
+            val shortcuts: List<ShortcutInfo>? = try { la.getShortcuts(query, user) } catch (_: Throwable) { null }
+            if (shortcuts.isNullOrEmpty()) {
+                Toast.makeText(this, "No shortcuts available", Toast.LENGTH_SHORT).show()
+                return
+            }
+            val labels = shortcuts.map { it.shortLabel?.toString() ?: it.id }.toTypedArray()
+            AlertDialog.Builder(this)
+                .setTitle("Shortcuts: ${app.name}")
+                .setItems(labels) { dlg, idx ->
+                    val si = shortcuts[idx]
+                    try {
+                        la.startShortcut(si, null, null)
+                    } catch (t: Throwable) {
+                        try { la.startShortcut(app.packageName, si.id, null, null, user) } catch (_: Throwable) {}
+                    }
+                    dlg.dismiss()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        } catch (t: Throwable) {
+            Toast.makeText(this, "Unable to open shortcuts", Toast.LENGTH_SHORT).show()
+        }
     }
 
     // -------- Sections: persistence + building --------
@@ -707,6 +854,13 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                 android.util.Log.e("LauncherActivity", "Sections initialization failed", e)
             }
             
+            // Initialize battery optimizer for adaptive performance
+            try {
+                batteryOptimizer = BatteryOptimizer(this)
+                lifecycle.addObserver(batteryOptimizer)
+                batteryOptimizer.initialize()
+            } catch (_: Throwable) { }
+
             // Enable drop targets (dock, sidebar, home)
             try {
                 setupDragDropTargets()
@@ -746,6 +900,27 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
 
             // Ensure searchBox is always initialized to avoid lateinit crashes on resume/usage
             ensureSearchBoxReady()
+
+            // Initialize gestures
+            try {
+                gestureManager = GestureManager(this)
+                gestureDetector = gestureManager.createGestureDetector()
+                // Register a callback to map configured actions to UI behaviors
+                val callback = object : GestureManager.GestureCallback {
+                    override fun onGestureDetected(gestureType: GestureManager.GestureType, event: MotionEvent?): Boolean {
+                        // Resolve configured action
+                        val cfg = gestureManager.getGestureConfig(gestureType)
+                        return handleGestureAction(cfg.action, cfg.targetPackage)
+                    }
+                }
+                // Register for primary gestures we support on home
+                gestureManager.registerCallback(GestureManager.GestureType.SWIPE_UP, callback)
+                gestureManager.registerCallback(GestureManager.GestureType.SWIPE_DOWN, callback)
+                gestureManager.registerCallback(GestureManager.GestureType.DOUBLE_TAP, callback)
+                gestureManager.registerCallback(GestureManager.GestureType.LONG_PRESS, callback)
+            } catch (e: Exception) {
+                android.util.Log.e("LauncherActivity", "Gesture initialization failed", e)
+            }
 
             // Widget host setup
             try {
@@ -1008,9 +1183,21 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
 
     override fun onResume() {
         super.onResume()
+        // Register preference change listener
+        prefs.registerOnSharedPreferenceChangeListener(prefsListener)
         // Re-ensure searchBox exists in case of configuration or fallback layouts
         ensureSearchBoxReady()
         applyUserSettings()
+        // Listen for package changes to auto-refresh drawer and home
+        try {
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_PACKAGE_ADDED)
+                addAction(Intent.ACTION_PACKAGE_REMOVED)
+                addAction(Intent.ACTION_PACKAGE_CHANGED)
+                addDataScheme("package")
+            }
+            registerReceiver(packageChangeReceiver, filter)
+        } catch (_: Throwable) {}
         // Ensure fragments are attached, then restore widgets once
         if (!widgetsRestoredOnce) {
             homePager.post {
@@ -1018,6 +1205,54 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                 widgetsRestoredOnce = true
             }
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Unregister preference change listener
+        prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
+        // Stop listening for package changes to avoid leaks
+        try { unregisterReceiver(packageChangeReceiver) } catch (_: Throwable) {}
+    }
+
+    // --- Package change handlers ---
+    private fun onPackageRemoved(pkg: String) {
+        try { IconCache.invalidate(pkg) } catch (_: Throwable) {}
+        // Remove from app list
+        appList = appList.filter { it.packageName != pkg }.toMutableList()
+        // Remove from dock/sidebar/recents
+        removeFromList(KEY_DOCK, pkg)
+        removeFromList(KEY_SIDEBAR, pkg)
+        removeFromList(KEY_RECENTS, pkg)
+        // Remove from all home pages
+        for (i in 0 until NORMAL_HOME_PAGES) {
+            val list = loadHomePageList(i).toMutableList()
+            if (list.remove(pkg)) saveHomePageList(i, list)
+        }
+        // Refresh UI
+        refreshDrawerPages()
+        rebuildDock()
+        rebuildSidebar()
+        refreshHomePages()
+    }
+
+    private fun onPackageAdded(pkg: String) {
+        // Rebuild app list and refresh UI
+        try { loadAppsAsync() } catch (_: Throwable) {}
+        refreshDrawerPages()
+        rebuildDock()
+        rebuildSidebar()
+        refreshHomePages()
+    }
+
+    private fun onPackageChanged(pkg: String) {
+        // Invalidate icon cache and refresh adapters
+        try { IconCache.invalidate(pkg) } catch (_: Throwable) {}
+        try { loadAppsAsync() } catch (_: Throwable) {}
+        refreshDrawerPages()
+        rebuildDock()
+        rebuildSidebar()
+        refreshHomePages()
     }
 
     private fun applyUserSettings() {
@@ -1069,6 +1304,8 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
             applyDockPositionAndPadding()
         }
     }
+
+    // This was a duplicate preference listener - removed
 
     // ---- Sidebar overlay (edge swipe) ----
     private fun enableSidebarOverlayIfHidden() {
@@ -1592,112 +1829,6 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
         }
     }
 
-    private fun loadAppsAsync() {
-        lifecycleScope.launch {
-            val loaded = withContext(Dispatchers.IO) {
-                val pm = packageManager
-                val intent = Intent(Intent.ACTION_MAIN, null).apply {
-                    addCategory(Intent.CATEGORY_LAUNCHER)
-                }
-                val packages = pm.queryIntentActivities(intent, 0)
-                val list = mutableListOf<AppInfo>()
-                for (resolveInfo in packages) {
-                    val ai = resolveInfo.activityInfo
-                    list.add(
-                        AppInfo(
-                            name = resolveInfo.loadLabel(pm).toString(),
-                            packageName = ai.packageName,
-                            className = ai.name,
-                            icon = try { resolveInfo.loadIcon(pm) } catch (_: Throwable) { null },
-                            applicationInfo = ai.applicationInfo
-                        )
-                    )
-                }
-                // Prepare placeholder info for synthetic entries using our own app's ApplicationInfo
-                val selfAppInfo = try { packageManager.getApplicationInfo(packageName, 0) } catch (_: Throwable) { null }
-                val placeholderIcon = try { getDrawable(R.mipmap.ic_launcher) } catch (_: Throwable) { null }
-                // Inject synthetic internal apps
-                list.add(AppInfo(name = "Calculator", packageName = INTERNAL_CALC_PKG, className = "", icon = placeholderIcon, applicationInfo = selfAppInfo ?: applicationInfo))
-                list.add(AppInfo(name = "7KSTUDIO", packageName = INTERNAL_STUDIO_PKG, className = "", icon = placeholderIcon, applicationInfo = selfAppInfo ?: applicationInfo))
-                list.add(AppInfo(name = "7K Browser", packageName = "com.sevenk.browser", className = "com.sevenk.browser.BrowserActivity", icon = placeholderIcon, applicationInfo = selfAppInfo ?: applicationInfo))
-                list.add(AppInfo(name = "7KLAWPREP", packageName = INTERNAL_LAW_PKG, className = "", icon = placeholderIcon, applicationInfo = selfAppInfo ?: applicationInfo))
-                // New synthetic PWA entries
-                list.add(AppInfo(name = "7K ITIHAAS", packageName = INTERNAL_ITIHAAS_PKG, className = "", icon = placeholderIcon, applicationInfo = selfAppInfo ?: applicationInfo))
-                list.add(AppInfo(name = "7K POLYGLOT", packageName = INTERNAL_POLYGLOT_PKG, className = "", icon = placeholderIcon, applicationInfo = selfAppInfo ?: applicationInfo))
-                list.add(AppInfo(name = "7K ECO", packageName = INTERNAL_ECO_PKG, className = "", icon = placeholderIcon, applicationInfo = selfAppInfo ?: applicationInfo))
-                list.add(AppInfo(name = "7K LIFE", packageName = INTERNAL_LIFE_PKG, className = "", icon = placeholderIcon, applicationInfo = selfAppInfo ?: applicationInfo))
-                list.sortedBy { it.name }
-            }
-            appList.clear()
-            appList.addAll(loaded)
-            // Initialize sections (defaults + auto-categorization if first time)
-            ensureSectionsInitialized()
-            // Initialize pager sections and populate pages
-            drawerPagerAdapter.setSections(getDrawerSections())
-            refreshDrawerPages()
-            // Skip heavy prewarm here; we'll defer it to a background coroutine after UI is shown
-            // to improve first-render time and reduce CPU spikes.
-        }
-        // Rebuild dock/sidebar with saved selections
-        rebuildDock()
-        rebuildSidebar()
-
-        // Hook up search now that data is ready
-        setupSearch()
-
-        // Refresh home pages to reflect loaded app labels/icons
-        refreshHomePages()
-
-        // Defer icon prewarm: prioritize pinned/recent, then others in small batches
-        prewarmIconsDeferred()
-    }
-
-    // Warm up icon bitmaps after initial UI is shown, prioritizing pinned/recent and batching others
-    private fun prewarmIconsDeferred() {
-        try {
-            val pinned = loadPackageList(KEY_DOCK) + loadPackageList(KEY_SIDEBAR)
-            val recents = loadPackageList(KEY_RECENTS)
-            val prioritized = (pinned + recents).distinct()
-            val rest = appList.map { it.packageName }.filter { it !in prioritized }
-            val order = prioritized + rest
-            lifecycleScope.launch(Dispatchers.IO) {
-                val size = try { getGeneralIconSizePx() } catch (_: Throwable) { dp(48) }
-                var count = 0
-                for (pkg in order) {
-                    try { IconCache.getBitmapForPackage(this@LauncherActivity, pkg, size) } catch (_: Throwable) {}
-                    // Yield and lightly pace to avoid bursts
-                    if (++count % 8 == 0) {
-                        kotlinx.coroutines.yield()
-                    }
-                    if (count % 32 == 0) {
-                        // small pause to keep CPU/battery low during long prewarm sessions
-                        kotlinx.coroutines.delay(12)
-                    }
-                }
-            }
-        } catch (_: Throwable) { }
-    }
-
-    private fun setupSearch() {
-        if (!::searchBox.isInitialized) return
-        searchBox.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun afterTextChanged(s: Editable?) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val q = s?.toString()?.trim()?.lowercase() ?: ""
-                // Debounce to avoid filtering on every keystroke
-                searchJob?.cancel()
-                searchJob = lifecycleScope.launch(Dispatchers.Default) {
-                    kotlinx.coroutines.delay(250)
-                    val filtered = if (q.isEmpty()) appList else appList.filter { it.name.lowercase().contains(q) }
-                    withContext(Dispatchers.Main) {
-                        refreshDrawerPages(filtered)
-                    }
-                }
-            }
-        })
-    }
-
     private lateinit var dockAdapter: DockSidebarAdapter
     private lateinit var sidebarAdapter: DockSidebarAdapter
     private var searchJob: kotlinx.coroutines.Job? = null
@@ -1840,6 +1971,8 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
         }
     }
 
+    
+
     private fun setupDock() {
         val lm = androidx.recyclerview.widget.LinearLayoutManager(this, RecyclerView.HORIZONTAL, false)
         dock.layoutManager = lm
@@ -1956,9 +2089,26 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
     }
 
     fun refreshHomePages() {
-        supportFragmentManager.fragments.forEach { f ->
-            if (f is HomePageFragment) {
-                f.refreshData()
+        // Refresh all home pages
+        supportFragmentManager.fragments.forEach { fragment ->
+            if (fragment is HomePageFragment) {
+                fragment.refreshData()
+            }
+        }
+    }
+    
+    /**
+     * Refreshes the app drawer with current settings
+     */
+    private fun refreshAppDrawer() {
+        if (::drawerPagerAdapter.isInitialized) {
+            // Get the current app drawer fragment if it exists
+            val currentFragment = supportFragmentManager.findFragmentByTag("f${appDrawerPager.currentItem}")
+            if (currentFragment is AppDrawerFragment) {
+                currentFragment.refreshAppDrawer()
+            } else {
+                // If we can't find the current fragment, refresh the whole adapter
+                drawerPagerAdapter.notifyDataSetChanged()
             }
         }
     }
@@ -2099,7 +2249,7 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
             appDrawerContainer.animate()
                 .translationY(0f)
                 .alpha(1f)
-                .setDuration(220)
+                .setDuration(try { batteryOptimizer.getAnimationDuration(220) } catch (_: Throwable) { 220 })
                 .setInterpolator(DecelerateInterpolator())
                 .withEndAction { appDrawerContainer.translationY = 0f }
                 .start()
@@ -2107,7 +2257,7 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
             appDrawerContainer.animate()
                 .translationY(h.toFloat())
                 .alpha(0f)
-                .setDuration(200)
+                .setDuration(try { batteryOptimizer.getAnimationDuration(200) } catch (_: Throwable) { 200 })
                 .setInterpolator(DecelerateInterpolator())
                 .withEndAction {
                     appDrawerContainer.visibility = View.GONE
@@ -2287,9 +2437,17 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                         val iconPref = prefs.getInt("icon_size", 1).coerceIn(0, 2)
                         val sizeRes = when (iconPref) { 0 -> R.dimen.app_icon_size_small; 2 -> R.dimen.app_icon_size_large; else -> R.dimen.app_icon_size_medium }
                         val size = resources.getDimensionPixelSize(sizeRes)
-                        val outFile = File(cacheDir, "crop_${'$'}{System.currentTimeMillis()}.png")
-                        val destUri = FileProvider.getUriForFile(this, "${'$'}packageName.fileprovider", outFile)
+                        val outFile = File(cacheDir, "crop_${System.currentTimeMillis()}.png")
+                        val destUri = FileProvider.getUriForFile(this, "$packageName.fileprovider", outFile)
                         try {
+                            // Grant UCrop temporary access to URIs
+                            try {
+                                grantUriPermission("com.yalantis.ucrop", srcUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            } catch (_: Throwable) {}
+                            try {
+                                grantUriPermission("com.yalantis.ucrop", destUri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                            } catch (_: Throwable) {}
+
                             UCrop.of(srcUri, destUri)
                                 .withAspectRatio(1f, 1f)
                                 .withMaxResultSize(size, size)
@@ -2437,6 +2595,37 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                 intent.putExtra(WebAppActivity.EXTRA_URL, "https://life.7klawprep.me/")
                 startActivity(intent)
                 recordRecent(INTERNAL_LIFE_PKG)
+                return
+            }
+            // Daily Essentials (synthetic)
+            if (app.packageName == INTERNAL_NOTES_PKG) {
+                val intent = Intent(this, com.sevenk.launcher.notes.ui.NotesActivity::class.java)
+                startActivity(intent)
+                recordRecent(INTERNAL_NOTES_PKG)
+                return
+            }
+            if (app.packageName == INTERNAL_CALENDAR2_PKG) {
+                val intent = Intent(this, WebAppActivity::class.java)
+                intent.putExtra(WebAppActivity.EXTRA_TITLE, "7K Calendar")
+                intent.putExtra(WebAppActivity.EXTRA_URL, "https://calendar.7klawprep.me/")
+                startActivity(intent)
+                recordRecent(INTERNAL_CALENDAR2_PKG)
+                return
+            }
+            if (app.packageName == INTERNAL_WEATHER_PKG) {
+                val intent = Intent(this, WebAppActivity::class.java)
+                intent.putExtra(WebAppActivity.EXTRA_TITLE, "7K Weather")
+                intent.putExtra(WebAppActivity.EXTRA_URL, "https://weather.7klawprep.me/")
+                startActivity(intent)
+                recordRecent(INTERNAL_WEATHER_PKG)
+                return
+            }
+            if (app.packageName == INTERNAL_MUSIC_PKG) {
+                val intent = Intent(this, WebAppActivity::class.java)
+                intent.putExtra(WebAppActivity.EXTRA_TITLE, "7K Music")
+                intent.putExtra(WebAppActivity.EXTRA_URL, "https://music.7klawprep.me/")
+                startActivity(intent)
+                recordRecent(INTERNAL_MUSIC_PKG)
                 return
             }
             // Internal 7KSTUDIO launcher
