@@ -109,14 +109,14 @@ class AppPrivacyAdapter(
             appName.text = app.appName
             
             val levels = AppPrivacyManager.PrivacyLevel.values()
-            val adapter = android.widget.ArrayAdapter(itemView.context, android.R.layout.simple_spinner_item,
+            val adapter = android.widget.ArrayAdapter(itemView.context, R.layout.item_glass_spinner_selected,
                 levels.map {
                     it.name.replace("_", " ")
                         .lowercase(Locale.getDefault())
                         .split(" ")
                         .joinToString(" ") { word -> word.replaceFirstChar { c -> c.titlecase(Locale.getDefault()) } }
                 })
-            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            adapter.setDropDownViewResource(R.layout.item_glass_spinner_dropdown)
             privacySpinner.adapter = adapter
             
             val currentIndex = levels.indexOf(app.privacyLevel)

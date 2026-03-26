@@ -57,7 +57,13 @@ Milestones: `M1 Core Reliability` → `M2 Power Features` → `M3 Premium Polish
 - ✅ Home interaction fix: Added robust long-press fallback via gesture detector to reliably open Home Options.
 - ✅ Ecosystem UX uplift: `TasksCommanderActivity` dialogs (set reminder, add/edit task, actions, open-tasks list) migrated to custom glass bottom sheets.
 - ✅ Ecosystem UX uplift: `FileForgeActivity` dialogs (create/open/save, rename, tags) migrated to custom glass input sheets.
+- ✅ Ecosystem UX uplift: `BudgetGuardianActivity` amount/category dialogs migrated to custom glass form sheets.
+- ✅ Ecosystem UX uplift: `CalendarActivity` note editor migrated to custom glass input sheet.
+- ✅ Ecosystem UX uplift: `MusicActivity` playlist creation migrated to custom glass input sheet.
 - ✅ Functional polish: `TasksCommanderActivity` performance summary text fixed (`Open N missions`) to remove formatting glitch.
+- ✅ Launcher UX uplift: `SettingsActivity` multi-select app management (`Manage Hidden/Dock/Sidebar Apps`) migrated from generic multi-choice alert dialog to custom glass multi-select sheet.
+- ✅ Launcher UX uplift: `SettingsActivity` preloaded wallpaper picker migrated from generic list alert dialog to custom glass action sheet.
+- ✅ Spinner modernization: `AppPrivacyActivity`, `GestureSettingsActivity`, and `EnhancedSettingsActivity` now use custom glass spinner item/dropdown layouts instead of `android.R.layout.simple_spinner_*`.
 
 UI/UX master framework file added:
 - `7k apps documentation/7K_UI_UX_Master_Framework.mf`
@@ -79,11 +85,9 @@ UI/UX master framework file added:
 
 ## Immediate sprint plan (next commits)
 
-1. Replace remaining generic dialogs in `LauncherActivity` (`homeScreen/homePager` long-press + add dialog + dock/sidebar multi-select editor).
-2. Replace remaining generic selector in `GestureSettingsActivity` app-target picker.
-3. Replace `TodoPageFragment` add/edit task dialog with custom glass input sheet.
-4. Start modern spinner migration in `AppPrivacyActivity`, `SettingsActivity`, `EnhancedSettingsActivity` (drop `android.R.layout.simple_spinner_*` adapters).
-5. Run build + smoke validation and update this backlog statuses.
+1. Run launcher smoke tests across settings and privacy flows after spinner/layout modernization.
+2. Continue scan for remaining generic controls in non-launcher ecosystem modules.
+3. Keep build + regression validation gate (`:app:assembleDebug`) for each migration wave.
 
 ---
 
@@ -106,23 +110,19 @@ Status: `Open` (prioritized)
 - `app/src/main/java/com/sevenk/launcher/TodoPageFragment.kt`
   - Add/Edit to-do dialog still uses `AlertDialog.Builder` input dialog.
 - `app/src/main/java/com/sevenk/launcher/SettingsActivity.kt`
-  - `openManageListDialog(...)` still uses `AlertDialog.Builder.setMultiChoiceItems`.
-  - `showWallpaperStorePicker()` still uses `AlertDialog.Builder` list picker.
+  - (completed in current wave) custom glass sheets now used for package multi-select and wallpaper picker.
 
 ### P2 — Spinner modernization (non-dialog generic controls)
 
 - `app/src/main/java/com/sevenk/launcher/AppPrivacyActivity.kt`
-  - Uses `android.R.layout.simple_spinner_item` / `simple_spinner_dropdown_item`.
+  - (completed in current wave) uses custom `item_glass_spinner_selected` / `item_glass_spinner_dropdown`.
 - `app/src/main/java/com/sevenk/launcher/GestureSettingsActivity.kt`
-  - Uses `android.R.layout.simple_spinner_item` / `simple_spinner_dropdown_item`.
+  - (completed in current wave) uses custom `item_glass_spinner_selected` / `item_glass_spinner_dropdown`.
 - `app/src/main/java/com/sevenk/launcher/settings/EnhancedSettingsActivity.kt`
-  - Theme/Grid/Drawer style adapters still use `android.R.layout.simple_spinner_*`.
+  - (completed in current wave) Theme/Grid/Drawer style adapters now use custom glass spinner layouts.
 
 ### P3 — Ecosystem apps under launcher package
 
 - Remaining `AlertDialog.Builder` usages exist in:
-  - `app/src/main/java/com/sevenk/launcher/ecosystem/BudgetGuardianActivity.kt`
-  - `app/src/main/java/com/sevenk/launcher/ecosystem/CalendarActivity.kt`
-  - `app/src/main/java/com/sevenk/launcher/ecosystem/FileForgeActivity.kt`
-  - `app/src/main/java/com/sevenk/launcher/ecosystem/MusicActivity.kt`
-  - `app/src/main/java/com/sevenk/launcher/ecosystem/TasksCommanderActivity.kt`
+  - (none identified in the previously flagged `BudgetGuardian/Calendar/FileForge/Music/TasksCommander` set)
+  - keep scanning newly added ecosystem modules for regressions.

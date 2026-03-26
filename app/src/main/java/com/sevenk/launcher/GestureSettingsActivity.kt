@@ -100,14 +100,14 @@ class GestureAdapter(
                 .split(" ").joinToString(" ") { it.replaceFirstChar { c -> c.titlecase(Locale.getDefault()) } }
             
             val actions = GestureManager.GestureAction.values()
-            val adapter = ArrayAdapter(itemView.context, android.R.layout.simple_spinner_item,
+            val adapter = ArrayAdapter(itemView.context, R.layout.item_glass_spinner_selected,
                 actions.map {
                     it.name.replace("_", " ")
                         .lowercase(Locale.getDefault())
                         .split(" ")
                         .joinToString(" ") { word -> word.replaceFirstChar { c -> c.titlecase(Locale.getDefault()) } }
                 })
-            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            adapter.setDropDownViewResource(R.layout.item_glass_spinner_dropdown)
             actionSpinner.adapter = adapter
             
             val currentIndex = actions.indexOf(config.action)

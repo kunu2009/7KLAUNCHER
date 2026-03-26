@@ -1,14 +1,16 @@
 package com.sevenk.launcher.ecosystem
 
 import android.os.Bundle
+import android.view.Gravity
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.appcompat.app.AppCompatActivity
 import android.text.InputType
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -189,12 +191,13 @@ class BudgetGuardianActivity : AppCompatActivity() {
                 addView(recurrenceInput)
             }
         }
-        AlertDialog.Builder(this)
-            .setTitle(title)
-            .setView(holder)
-            .setPositiveButton("Save") { _, _ ->
+        showGlassFormSheet(
+            title = title,
+            content = holder,
+            primaryLabel = "Save"
+        ) {
                 val amount = input.text?.toString()?.toFloatOrNull() ?: 0f
-                if (amount <= 0f) return@setPositiveButton
+                if (amount <= 0f) return@showGlassFormSheet
                 when (mode) {
                     "budget" -> prefs.edit().putFloat("budget", amount).apply()
                     "expense" -> {
@@ -218,9 +221,7 @@ class BudgetGuardianActivity : AppCompatActivity() {
                     }
                 }
                 refresh()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+        }
     }
 
     private fun showCategoryLimitDialog() {
@@ -237,20 +238,99 @@ class BudgetGuardianActivity : AppCompatActivity() {
             addView(categoryInput)
             addView(amountInput)
         }
-        AlertDialog.Builder(this)
-            .setTitle("Set Category Limit")
-            .setView(holder)
-            .setPositiveButton("Save") { _, _ ->
+        showGlassFormSheet(
+            title = "Set Category Limit",
+            content = holder,
+            primaryLabel = "Save"
+        ) {
                 val category = categoryInput.text?.toString()?.trim().orEmpty().ifBlank { "General" }
                 val amount = amountInput.text?.toString()?.toFloatOrNull()?.coerceAtLeast(0f) ?: 0f
                 val limits = loadCategoryLimits().toMutableMap()
                 limits[category] = amount
                 saveCategoryLimits(limits)
                 refresh()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+        }
     }
+
+    private fun showGlassFormSheet(
+        title: String,
+        content: LinearLayout,
+        primaryLabel: String,
+        onPrimary: () -> Unit
+    ) {
+        val sheet = BottomSheetDialog(this)
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(20))
+            setBackgroundColor(0xFF1B1730.toInt())
+        }
+        root.addView(TextView(this).apply {
+            text = title
+            textSize = 18f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(8), dp(4), dp(8), dp(12))
+        })
+
+        styleFormInputs(content)
+        val contentLp = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(12) }
+        root.addView(content, contentLp)
+
+        root.addView(TextView(this).apply {
+            text = primaryLabel
+            textSize = 15f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            setBackgroundColor(0xFF6C4BFF.toInt())
+            foreground = AppCompatResources.getDrawable(this@BudgetGuardianActivity, android.R.drawable.list_selector_background)
+            setOnClickListener {
+                onPrimary()
+                sheet.dismiss()
+            }
+        })
+
+        root.addView(TextView(this).apply {
+            text = "Cancel"
+            textSize = 14f
+            setTextColor(0xFF80CBC4.toInt())
+            gravity = Gravity.CENTER
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            setOnClickListener { sheet.dismiss() }
+        })
+
+        sheet.setContentView(root)
+        sheet.setOnShowListener {
+            val firstInput = (0 until content.childCount)
+                .map { content.getChildAt(it) }
+                .firstOrNull { it is EditText } as? EditText
+            firstInput?.requestFocus()
+            firstInput?.setSelection(firstInput.text?.length ?: 0)
+            val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+            imm?.showSoftInput(firstInput, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        }
+        sheet.show()
+    }
+
+    private fun styleFormInputs(container: LinearLayout) {
+        for (i in 0 until container.childCount) {
+            val child = container.getChildAt(i)
+            if (child is EditText) {
+                child.setTextColor(0xFFFFFFFF.toInt())
+                child.setHintTextColor(0x99FFFFFF.toInt())
+                child.setBackgroundColor(0xFF2A235F.toInt())
+                child.setPadding(dp(12), dp(10), dp(12), dp(10))
+                val lp = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = dp(8) }
+                child.layoutParams = lp
+            }
+        }
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun refresh() {
         val budget = prefs.getFloat("budget", 0f)

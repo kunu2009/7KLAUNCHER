@@ -5,17 +5,21 @@ import android.app.WallpaperManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.Gravity
 import android.webkit.CookieManager
 import android.webkit.WebStorage
 import android.widget.Button
 import android.widget.CompoundButton
+import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.sevenk.launcher.backup.SimpleBackupManager
 import com.sevenk.launcher.backup.BackupManagerContract
 import kotlinx.coroutines.launch
@@ -456,24 +460,17 @@ class SettingsActivity : AppCompatActivity() {
             .map { it.activityInfo.packageName to it.loadLabel(pm).toString() }
             .sortedBy { it.second }
         val packages = entries.map { it.first }
-        val labels = entries.map { it.second }.toTypedArray()
         val current = loadPackageList(key).toMutableSet()
-        val checked = packages.map { current.contains(it) }.toBooleanArray()
 
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle(title)
-            .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
-                val pkg = packages[which]
-                if (isChecked) current.add(pkg) else current.remove(pkg)
-            }
-            .setPositiveButton("Save") { d, _ ->
-                // Save in label order for consistency
-                val ordered = packages.filter { current.contains(it) }
+        showGlassMultiSelectSheet(
+            title = title,
+            entries = entries,
+            initiallySelected = current,
+            onSave = { selected ->
+                val ordered = packages.filter { selected.contains(it) }
                 savePackageList(key, ordered)
-                d.dismiss()
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+        )
     }
 
     private fun loadPackageList(key: String): List<String> {
@@ -578,16 +575,156 @@ class SettingsActivity : AppCompatActivity() {
             if (fileName.equals("7.jpeg", ignoreCase = true)) "$fileName (default)" else fileName
         }.toTypedArray()
 
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle(getString(R.string.choose_preloaded))
-            .setItems(labels) { dialog, which ->
+        val actions = labels.mapIndexed { which, label ->
+            label to {
                 val selected = assetsList[which]
                 applyWallpaperFromAsset(selected)
-                dialog.dismiss()
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+        }
+        showGlassActionSheet(getString(R.string.choose_preloaded), actions)
     }
+
+    private fun showGlassActionSheet(title: String, actions: List<Pair<String, () -> Unit>>) {
+        val sheet = BottomSheetDialog(this)
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(20))
+            setBackgroundResource(R.drawable.dialog_background)
+        }
+
+        root.addView(TextView(this).apply {
+            text = title
+            textSize = 18f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(8), dp(4), dp(8), dp(12))
+        })
+
+        actions.forEach { (label, onClick) ->
+            val item = TextView(this).apply {
+                text = label
+                textSize = 15f
+                setTextColor(0xFFFFFFFF.toInt())
+                setPadding(dp(16), dp(14), dp(16), dp(14))
+                setBackgroundResource(R.drawable.glass_panel)
+                foreground = AppCompatResources.getDrawable(this@SettingsActivity, android.R.drawable.list_selector_background)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    sheet.dismiss()
+                    onClick.invoke()
+                }
+            }
+            val lp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(8) }
+            root.addView(item, lp)
+        }
+
+        root.addView(TextView(this).apply {
+            text = "Cancel"
+            textSize = 14f
+            setTextColor(0xFF80CBC4.toInt())
+            gravity = Gravity.CENTER
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            setOnClickListener { sheet.dismiss() }
+        })
+
+        sheet.setContentView(root)
+        sheet.show()
+    }
+
+    private fun showGlassMultiSelectSheet(
+        title: String,
+        entries: List<Pair<String, String>>,
+        initiallySelected: Set<String>,
+        onSave: (Set<String>) -> Unit
+    ) {
+        val selected = initiallySelected.toMutableSet()
+        val sheet = BottomSheetDialog(this)
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(20))
+            setBackgroundResource(R.drawable.dialog_background)
+        }
+
+        root.addView(TextView(this).apply {
+            text = title
+            textSize = 18f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(8), dp(4), dp(8), dp(8))
+        })
+
+        val summary = TextView(this).apply {
+            textSize = 12f
+            setTextColor(0xFFB0BEC5.toInt())
+            setPadding(dp(8), 0, dp(8), dp(10))
+        }
+        root.addView(summary)
+
+        fun updateSummary() {
+            summary.text = "Selected ${selected.size} of ${entries.size}"
+        }
+
+        entries.forEach { (pkg, label) ->
+            val item = TextView(this).apply {
+                textSize = 14f
+                setPadding(dp(16), dp(12), dp(16), dp(12))
+                foreground = AppCompatResources.getDrawable(this@SettingsActivity, android.R.drawable.list_selector_background)
+                isClickable = true
+                isFocusable = true
+            }
+
+            fun renderState() {
+                val isChecked = selected.contains(pkg)
+                item.text = if (isChecked) "✓ $label" else label
+                item.setTextColor(if (isChecked) 0xFF80CBC4.toInt() else 0xFFFFFFFF.toInt())
+                item.setBackgroundResource(R.drawable.glass_panel)
+            }
+
+            item.setOnClickListener {
+                if (selected.contains(pkg)) selected.remove(pkg) else selected.add(pkg)
+                renderState()
+                updateSummary()
+            }
+            renderState()
+
+            val lp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(8) }
+            root.addView(item, lp)
+        }
+
+        updateSummary()
+
+        root.addView(TextView(this).apply {
+            text = "Save"
+            textSize = 15f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            setBackgroundResource(R.drawable.glass_panel)
+            foreground = AppCompatResources.getDrawable(this@SettingsActivity, android.R.drawable.list_selector_background)
+            setOnClickListener {
+                onSave(selected)
+                sheet.dismiss()
+            }
+        })
+
+        root.addView(TextView(this).apply {
+            text = "Cancel"
+            textSize = 14f
+            setTextColor(0xFF80CBC4.toInt())
+            gravity = Gravity.CENTER
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            setOnClickListener { sheet.dismiss() }
+        })
+
+        sheet.setContentView(root)
+        sheet.show()
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun applyWallpaperFromAsset(assetName: String) {
         try {

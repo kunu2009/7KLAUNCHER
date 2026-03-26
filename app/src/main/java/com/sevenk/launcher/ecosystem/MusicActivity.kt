@@ -1,6 +1,7 @@
 package com.sevenk.launcher.ecosystem
 
 import android.os.Bundle
+import android.view.Gravity
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
@@ -9,7 +10,9 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.cardview.widget.CardView
+import com.google.android.material.bottomsheet.BottomSheetDialog
 
 class MusicActivity : AppCompatActivity() {
 
@@ -194,17 +197,81 @@ class MusicActivity : AppCompatActivity() {
             hint = "Playlist name"
         }
 
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("Create Playlist")
-            .setView(input)
-            .setPositiveButton("Create") { _, _ ->
+        showGlassInputSheet(
+            title = "Create Playlist",
+            input = input,
+            primaryLabel = "Create"
+        ) {
                 if (input.text.isNotEmpty()) {
                     playlists.add(Playlist(input.text.toString(), 0))
                     Toast.makeText(this, "Playlist created!", Toast.LENGTH_SHORT).show()
                     recreate()
                 }
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+        }
     }
+
+    private fun showGlassInputSheet(
+        title: String,
+        input: EditText,
+        primaryLabel: String,
+        secondaryLabel: String = "Cancel",
+        onPrimary: () -> Unit
+    ) {
+        val sheet = BottomSheetDialog(this)
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(20))
+            setBackgroundColor(0xFF1B1730.toInt())
+        }
+
+        root.addView(TextView(this).apply {
+            text = title
+            textSize = 18f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(8), dp(4), dp(8), dp(12))
+        })
+
+        input.setTextColor(0xFFFFFFFF.toInt())
+        input.setHintTextColor(0x99FFFFFF.toInt())
+        input.setBackgroundColor(0xFF2A235F.toInt())
+        input.setPadding(dp(12), dp(10), dp(12), dp(10))
+        val inputLp = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(12) }
+        root.addView(input, inputLp)
+
+        root.addView(TextView(this).apply {
+            text = primaryLabel
+            textSize = 15f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            setBackgroundColor(0xFF6C4BFF.toInt())
+            foreground = AppCompatResources.getDrawable(this@MusicActivity, android.R.drawable.list_selector_background)
+            setOnClickListener {
+                onPrimary()
+                sheet.dismiss()
+            }
+        })
+
+        root.addView(TextView(this).apply {
+            text = secondaryLabel
+            textSize = 14f
+            setTextColor(0xFF80CBC4.toInt())
+            gravity = Gravity.CENTER
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            setOnClickListener { sheet.dismiss() }
+        })
+
+        sheet.setContentView(root)
+        sheet.setOnShowListener {
+            input.requestFocus()
+            input.setSelection(input.text?.length ?: 0)
+            val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+            imm?.showSoftInput(input, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        }
+        sheet.show()
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 }

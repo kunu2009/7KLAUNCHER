@@ -81,8 +81,8 @@ class EnhancedSettingsActivity : AppCompatActivity() {
         
         // Theme selection
         val themes = listOf("Light", "Dark", "Auto")
-        val themeAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, themes)
-        themeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        val themeAdapter = ArrayAdapter(this, R.layout.item_glass_spinner_selected, themes)
+        themeAdapter.setDropDownViewResource(R.layout.item_glass_spinner_dropdown)
         themeSpinner.adapter = themeAdapter
         
         val currentTheme = prefs.getString("theme", "Auto")
@@ -142,8 +142,8 @@ class EnhancedSettingsActivity : AppCompatActivity() {
         
         // Grid size options
         val gridSizes = arrayOf("3x4", "4x5", "4x6", "5x6", "5x7")
-        val gridAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, gridSizes)
-        gridAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        val gridAdapter = ArrayAdapter(this, R.layout.item_glass_spinner_selected, gridSizes)
+        gridAdapter.setDropDownViewResource(R.layout.item_glass_spinner_dropdown)
         gridSizeSpinner.adapter = gridAdapter
         
         val currentGrid = prefs.getString("grid_size", "4x5")
@@ -178,8 +178,8 @@ class EnhancedSettingsActivity : AppCompatActivity() {
         
         // Drawer style
         val drawerStyles = arrayOf("Paged", "Vertical List", "Categories")
-        val styleAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, drawerStyles)
-        styleAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        val styleAdapter = ArrayAdapter(this, R.layout.item_glass_spinner_selected, drawerStyles)
+        styleAdapter.setDropDownViewResource(R.layout.item_glass_spinner_dropdown)
         drawerStyleSpinner.adapter = styleAdapter
         
         val currentStyle = prefs.getString("drawer_style", "Paged")
