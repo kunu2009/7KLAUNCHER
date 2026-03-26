@@ -1,24 +1,28 @@
 package com.sevenk.launcher.ecosystem
 
 import android.os.Bundle
+import android.text.InputType
 import android.view.Gravity
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.GridLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import android.text.InputType
 import kotlin.math.abs
 
 class TasksCommanderActivity : AppCompatActivity() {
 
     private val prefs by lazy { getSharedPreferences("sevenk_tasks_commander", MODE_PRIVATE) }
     private val tasks = mutableListOf<TaskEntry>()
-    private lateinit var taskListContainer: LinearLayout
-    private lateinit var statsText: TextView
-    private var activeFilter: Filter = Filter.ALL
+
+    private lateinit var performanceText: TextView
+    private lateinit var progressRingText: TextView
+    private lateinit var scheduleGrid: GridLayout
+    private lateinit var timelineContainer: LinearLayout
 
     private data class TaskEntry(
         val id: Long,
@@ -31,169 +35,352 @@ class TasksCommanderActivity : AppCompatActivity() {
         val createdAt: Long
     )
 
-    private enum class Filter { ALL, OPEN, DONE, Q1, Q2, Q3, Q4 }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         title = "7K Tasks Commander"
 
         loadTasks()
 
-        val root = ScrollView(this)
+        val root = FrameLayout(this).apply {
+            setBackgroundColor(0xFF1D1552.toInt())
+        }
+
+        val scroll = ScrollView(this)
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(24, 24, 24, 24)
-            setBackgroundColor(0xFF171717.toInt())
+            setPadding(24, 24, 24, 140)
         }
 
-        val heading = TextView(this).apply {
-            text = "7K Tasks Commander"
-            textSize = 24f
+        val topRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val titleText = TextView(this).apply {
+            text = "Let's improve\nour performance."
+            textSize = 28f
+            setTextColor(0xFFFFFFFF.toInt())
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val bellBtn = Button(this).apply {
+            text = "🔔"
+            isAllCaps = false
+            setBackgroundColor(0xFF2A235F.toInt())
             setTextColor(0xFFFFFFFF.toInt())
         }
+        topRow.addView(titleText)
+        topRow.addView(bellBtn)
 
-        val sub = TextView(this).apply {
-            text = "Offline command board for your daily missions"
-            textSize = 13f
-            setTextColor(0xFFBBBBBB.toInt())
-            setPadding(0, 8, 0, 16)
+        val performanceCard = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(20, 20, 20, 20)
+            setBackgroundColor(0xFF161326.toInt())
         }
-
-        statsText = TextView(this).apply {
-            textSize = 13f
-            setTextColor(0xFF80CBC4.toInt())
-            setPadding(12, 12, 12, 12)
-            setBackgroundColor(0xFF202020.toInt())
+        val perfLeft = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
-
-        val addBtn = Button(this).apply {
-            text = "+ Add Task"
+        performanceText = TextView(this).apply {
+            textSize = 13f
+            setTextColor(0xFFD1C4E9.toInt())
+            text = "Great, you're nearly done with today's tasks."
+        }
+        val viewTasksBtn = Button(this).apply {
+            text = "View Tasks"
             isAllCaps = false
+            setBackgroundColor(0xFF6C4BFF.toInt())
+            setTextColor(0xFFFFFFFF.toInt())
+            setOnClickListener { showTaskListDialog() }
+        }
+        perfLeft.addView(performanceText)
+        perfLeft.addView(viewTasksBtn)
+
+        progressRingText = TextView(this).apply {
+            text = "0%"
+            textSize = 22f
+            setTextColor(0xFFB39DDB.toInt())
+            gravity = Gravity.CENTER
+            setPadding(20, 20, 20, 20)
+            setBackgroundColor(0xFF231D44.toInt())
+        }
+        performanceCard.addView(perfLeft)
+        performanceCard.addView(progressRingText)
+
+        val scheduleTitle = TextView(this).apply {
+            text = "Today's Schedule"
+            textSize = 22f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(0, 20, 0, 10)
+        }
+
+        scheduleGrid = GridLayout(this).apply {
+            columnCount = 2
+            rowCount = 2
+        }
+
+        val reminderBtn = Button(this).apply {
+            text = "Set Reminder"
+            isAllCaps = false
+            setTextColor(0xFFFFFFFF.toInt())
+            setBackgroundColor(0xFF6C4BFF.toInt())
+            setOnClickListener { showQuickReminderDialog() }
+        }
+
+        val timelineTitle = TextView(this).apply {
+            text = "Timeline"
+            textSize = 20f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(0, 18, 0, 8)
+        }
+
+        timelineContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        content.addView(topRow)
+        content.addView(performanceCard)
+        content.addView(scheduleTitle)
+        content.addView(scheduleGrid)
+        content.addView(reminderBtn)
+        content.addView(timelineTitle)
+        content.addView(timelineContainer)
+
+        scroll.addView(content)
+        root.addView(scroll)
+
+        val bottomBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setBackgroundColor(0xFF151221.toInt())
+            setPadding(12, 12, 12, 12)
+        }
+        fun nav(label: String): Button = Button(this).apply {
+            text = label
+            isAllCaps = false
+            setBackgroundColor(0x00000000)
+            setTextColor(0xFFBDB3D9.toInt())
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        bottomBar.addView(nav("◻"))
+        bottomBar.addView(nav("📅"))
+        bottomBar.addView(nav("📋"))
+        bottomBar.addView(nav("👤"))
+
+        val bottomLp = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT
+        ).apply { gravity = Gravity.BOTTOM }
+        root.addView(bottomBar, bottomLp)
+
+        val addFab = Button(this).apply {
+            text = "+"
+            textSize = 28f
+            isAllCaps = false
+            setTextColor(0xFFFFFFFF.toInt())
+            setBackgroundColor(0xFF2E294D.toInt())
             setOnClickListener { showAddTaskDialog() }
         }
+        val fabLp = FrameLayout.LayoutParams(140, 140).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            bottomMargin = 34
+        }
+        root.addView(addFab, fabLp)
 
-        val clearBtn = Button(this).apply {
-            text = "Clear Done"
-            isAllCaps = false
-            setOnClickListener {
-                if (tasks.isNotEmpty()) {
-                    tasks.removeAll { it.done }
-                    saveTasks()
-                    renderTasks()
-                }
-            }
-        }
-
-        val allBtn = Button(this).apply {
-            text = "All"
-            isAllCaps = false
-            setOnClickListener { activeFilter = Filter.ALL; renderTasks() }
-        }
-        val openBtn = Button(this).apply {
-            text = "Open"
-            isAllCaps = false
-            setOnClickListener { activeFilter = Filter.OPEN; renderTasks() }
-        }
-        val doneBtn = Button(this).apply {
-            text = "Done"
-            isAllCaps = false
-            setOnClickListener { activeFilter = Filter.DONE; renderTasks() }
-        }
-
-        val q1Btn = Button(this).apply {
-            text = "Q1"
-            isAllCaps = false
-            setOnClickListener { activeFilter = Filter.Q1; renderTasks() }
-        }
-        val q2Btn = Button(this).apply {
-            text = "Q2"
-            isAllCaps = false
-            setOnClickListener { activeFilter = Filter.Q2; renderTasks() }
-        }
-        val q3Btn = Button(this).apply {
-            text = "Q3"
-            isAllCaps = false
-            setOnClickListener { activeFilter = Filter.Q3; renderTasks() }
-        }
-        val q4Btn = Button(this).apply {
-            text = "Q4"
-            isAllCaps = false
-            setOnClickListener { activeFilter = Filter.Q4; renderTasks() }
-        }
-
-        val buttons = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        buttons.addView(addBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        buttons.addView(clearBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-
-        val filters = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 10, 0, 0)
-        }
-        filters.addView(allBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        filters.addView(openBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        filters.addView(doneBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-
-        val matrixFilters = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 8, 0, 0)
-        }
-        matrixFilters.addView(q1Btn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        matrixFilters.addView(q2Btn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        matrixFilters.addView(q3Btn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        matrixFilters.addView(q4Btn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-
-        val hint = TextView(this).apply {
-            text = "Matrix: Q1 urgent+important • Q2 important • Q3 urgent • Q4 later"
-            textSize = 11f
-            setTextColor(0xFF90A4AE.toInt())
-            setPadding(0, 8, 0, 0)
-        }
-
-        taskListContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, 18, 0, 0)
-        }
-
-        content.addView(heading)
-        content.addView(sub)
-        content.addView(statsText)
-        content.addView(buttons)
-        content.addView(filters)
-        content.addView(matrixFilters)
-        content.addView(hint)
-        content.addView(taskListContainer)
-
-        root.addView(content)
         setContentView(root)
-
-        renderTasks()
+        renderDashboard()
     }
 
-    private fun showAddTaskDialog() {
+    private fun renderDashboard() {
+        val total = tasks.size
+        val done = tasks.count { it.done }
+        val open = tasks.filter { !it.done }
+        val percent = if (total == 0) 0 else ((done * 100f) / total).toInt()
+        progressRingText.text = "$percent%"
+        performanceText.text = "Open $${open.size} missions • Completed $done of $total"
+
+        renderScheduleCards(open)
+        renderTimeline(open)
+    }
+
+    private fun renderScheduleCards(open: List<TaskEntry>) {
+        scheduleGrid.removeAllViews()
+        val palette = intArrayOf(
+            0xFF6C4BFF.toInt(),
+            0xFF1FBF8F.toInt(),
+            0xFF2F9DF4.toInt(),
+            0xFF7A53D8.toInt()
+        )
+        val top = open.sortedWith(compareBy<TaskEntry> { it.priority }.thenBy { it.dueAt.takeIf { d -> d > 0 } ?: Long.MAX_VALUE }).take(4)
+
+        if (top.isEmpty()) {
+            scheduleGrid.addView(TextView(this).apply {
+                text = "No tasks yet. Tap + to add your first mission."
+                setTextColor(0xFFD1C4E9.toInt())
+                textSize = 14f
+                setPadding(10, 10, 10, 10)
+            })
+            return
+        }
+
+        top.forEachIndexed { index, task ->
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(18, 18, 18, 18)
+                setBackgroundColor(palette[index % palette.size])
+                setOnClickListener { showTaskActionDialog(task) }
+            }
+            val name = TextView(this).apply {
+                text = task.title
+                setTextColor(0xFFFFFFFF.toInt())
+                textSize = 16f
+            }
+            val meta = TextView(this).apply {
+                text = taskMeta(task)
+                setTextColor(0xFFEDE7F6.toInt())
+                textSize = 12f
+                setPadding(0, 8, 0, 0)
+            }
+            card.addView(name)
+            card.addView(meta)
+
+            val lp = GridLayout.LayoutParams().apply {
+                width = 0
+                height = GridLayout.LayoutParams.WRAP_CONTENT
+                columnSpec = GridLayout.spec(index % 2, 1f)
+                rowSpec = GridLayout.spec(index / 2)
+                setMargins(0, 0, 10, 10)
+            }
+            scheduleGrid.addView(card, lp)
+        }
+    }
+
+    private fun renderTimeline(open: List<TaskEntry>) {
+        timelineContainer.removeAllViews()
+        val sorted = open.sortedWith(compareBy<TaskEntry> { it.dueAt.takeIf { d -> d > 0 } ?: Long.MAX_VALUE }.thenBy { it.priority }).take(6)
+
+        if (sorted.isEmpty()) {
+            timelineContainer.addView(TextView(this).apply {
+                text = "Timeline is clear. Enjoy the calm."
+                setTextColor(0xFFD1C4E9.toInt())
+                textSize = 13f
+            })
+            return
+        }
+
+        sorted.forEachIndexed { idx, task ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, 8, 0, 8)
+            }
+            val hour = TextView(this).apply {
+                val slot = 9 + idx
+                text = String.format("%02d:00", slot)
+                setTextColor(0xFFBDB3D9.toInt())
+                textSize = 13f
+                layoutParams = LinearLayout.LayoutParams(120, LinearLayout.LayoutParams.WRAP_CONTENT)
+            }
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(12, 12, 12, 12)
+                setBackgroundColor(0xFF1B1730.toInt())
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                setOnClickListener { showTaskActionDialog(task) }
+            }
+            card.addView(TextView(this).apply {
+                text = task.title
+                setTextColor(0xFFFFFFFF.toInt())
+                textSize = 14f
+            })
+            card.addView(TextView(this).apply {
+                text = taskMeta(task)
+                setTextColor(0xFFBDB3D9.toInt())
+                textSize = 11f
+            })
+            row.addView(hour)
+            row.addView(card)
+            timelineContainer.addView(row)
+        }
+    }
+
+    private fun taskMeta(task: TaskEntry): String {
+        val priority = when (task.priority) { 1 -> "High"; 3 -> "Low"; else -> "Normal" }
+        val urgent = if (task.urgent) " • Urgent" else ""
+        val due = if (task.dueAt > 0) {
+            val diff = task.dueAt - System.currentTimeMillis()
+            val days = abs(diff) / 86_400_000L
+            if (diff >= 0) " • due ${days}d" else " • overdue ${days}d"
+        } else ""
+        val recur = if (task.recurrenceDays > 0) " • every ${task.recurrenceDays}d" else ""
+        return "$priority$urgent$due$recur"
+    }
+
+    private fun showQuickReminderDialog() {
+        val titleInput = EditText(this).apply {
+            hint = "Reminder title"
+            inputType = InputType.TYPE_CLASS_TEXT
+        }
+        val dueInput = EditText(this).apply {
+            hint = "Due in days (1 default)"
+            inputType = InputType.TYPE_CLASS_NUMBER
+            setText("1")
+        }
+        val holder = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(titleInput)
+            addView(dueInput)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Set Reminder")
+            .setView(holder)
+            .setPositiveButton("Save") { _, _ ->
+                val title = titleInput.text?.toString()?.trim().orEmpty()
+                if (title.isBlank()) return@setPositiveButton
+                val days = dueInput.text?.toString()?.toIntOrNull()?.coerceIn(0, 3650) ?: 1
+                val now = System.currentTimeMillis()
+                tasks.add(0, TaskEntry(
+                    id = now,
+                    title = title,
+                    priority = 1,
+                    urgent = true,
+                    dueAt = now + days * 86_400_000L,
+                    recurrenceDays = 0,
+                    done = false,
+                    createdAt = now
+                ))
+                saveTasks()
+                renderDashboard()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showAddTaskDialog(existing: TaskEntry? = null) {
         val input = EditText(this).apply {
             hint = "Task title"
             inputType = InputType.TYPE_CLASS_TEXT
+            setText(existing?.title.orEmpty())
         }
         val priorityInput = EditText(this).apply {
             hint = "Priority (1 high, 2 normal, 3 low)"
             inputType = InputType.TYPE_CLASS_NUMBER
+            setText(existing?.priority?.toString() ?: "2")
         }
         val urgentInput = EditText(this).apply {
-            hint = "Urgent? (y/n, default n)"
+            hint = "Urgent? (y/n)"
             inputType = InputType.TYPE_CLASS_TEXT
+            setText(if (existing?.urgent == true) "y" else "n")
         }
         val dueDaysInput = EditText(this).apply {
             hint = "Due in days (0 none)"
             inputType = InputType.TYPE_CLASS_NUMBER
+            val days = if (existing != null && existing.dueAt > 0) {
+                ((existing.dueAt - System.currentTimeMillis()) / 86_400_000L).toInt().coerceAtLeast(0)
+            } else 0
+            setText(days.toString())
         }
         val recurrenceInput = EditText(this).apply {
             hint = "Repeat every N days (0 none)"
             inputType = InputType.TYPE_CLASS_NUMBER
+            setText(existing?.recurrenceDays?.toString() ?: "0")
         }
         val holder = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -203,165 +390,118 @@ class TasksCommanderActivity : AppCompatActivity() {
             addView(dueDaysInput)
             addView(recurrenceInput)
         }
+
         AlertDialog.Builder(this)
-            .setTitle("New Commander Task")
+            .setTitle(if (existing == null) "New Task" else "Edit Task")
             .setView(holder)
             .setPositiveButton("Save") { _, _ ->
                 val value = input.text?.toString()?.trim().orEmpty()
-                if (value.isNotBlank()) {
-                    val now = System.currentTimeMillis()
-                    val p = priorityInput.text?.toString()?.toIntOrNull()?.coerceIn(1, 3) ?: 2
-                    val urgent = urgentInput.text?.toString()?.trim()?.lowercase()?.startsWith("y") == true
-                    val dueDays = dueDaysInput.text?.toString()?.toIntOrNull()?.coerceIn(0, 3650) ?: 0
-                    val recurrenceDays = recurrenceInput.text?.toString()?.toIntOrNull()?.coerceIn(0, 3650) ?: 0
-                    val dueAt = if (dueDays > 0) now + (dueDays * 86_400_000L) else 0L
+                if (value.isBlank()) return@setPositiveButton
+                val now = System.currentTimeMillis()
+                val p = priorityInput.text?.toString()?.toIntOrNull()?.coerceIn(1, 3) ?: 2
+                val urgent = urgentInput.text?.toString()?.trim()?.lowercase()?.startsWith("y") == true
+                val dueDays = dueDaysInput.text?.toString()?.toIntOrNull()?.coerceIn(0, 3650) ?: 0
+                val recurrenceDays = recurrenceInput.text?.toString()?.toIntOrNull()?.coerceIn(0, 3650) ?: 0
+                val dueAt = if (dueDays > 0) now + dueDays * 86_400_000L else 0L
+
+                if (existing == null) {
                     tasks.add(0, TaskEntry(now, value, p, urgent, dueAt, recurrenceDays, false, now))
-                    saveTasks()
-                    renderTasks()
+                } else {
+                    val idx = tasks.indexOfFirst { it.id == existing.id }
+                    if (idx >= 0) {
+                        tasks[idx] = existing.copy(
+                            title = value,
+                            priority = p,
+                            urgent = urgent,
+                            dueAt = dueAt,
+                            recurrenceDays = recurrenceDays
+                        )
+                    }
+                }
+                saveTasks()
+                renderDashboard()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showTaskActionDialog(task: TaskEntry) {
+        val actions = mutableListOf<String>()
+        actions.add(if (task.done) "Undo" else "Mark Done")
+        actions.add("Edit")
+        actions.add("Duplicate")
+        actions.add("Delete")
+
+        AlertDialog.Builder(this)
+            .setTitle(task.title)
+            .setItems(actions.toTypedArray()) { _, which ->
+                when (actions[which]) {
+                    "Mark Done", "Undo" -> toggleDone(task)
+                    "Edit" -> showAddTaskDialog(task)
+                    "Duplicate" -> {
+                        val now = System.currentTimeMillis()
+                        tasks.add(0, task.copy(id = now, done = false, createdAt = now))
+                        saveTasks()
+                        renderDashboard()
+                    }
+                    "Delete" -> {
+                        tasks.removeAll { it.id == task.id }
+                        saveTasks()
+                        renderDashboard()
+                    }
                 }
             }
             .setNegativeButton("Cancel", null)
             .show()
     }
 
-    private fun renderTasks() {
-        taskListContainer.removeAllViews()
-        val filtered = when (activeFilter) {
-            Filter.ALL -> tasks
-            Filter.OPEN -> tasks.filter { !it.done }
-            Filter.DONE -> tasks.filter { it.done }
-            Filter.Q1 -> tasks.filter { !it.done && quadrantOf(it) == "Q1" }
-            Filter.Q2 -> tasks.filter { !it.done && quadrantOf(it) == "Q2" }
-            Filter.Q3 -> tasks.filter { !it.done && quadrantOf(it) == "Q3" }
-            Filter.Q4 -> tasks.filter { !it.done && quadrantOf(it) == "Q4" }
-        }.sortedWith(compareBy<TaskEntry> { it.done }.thenBy { it.priority }.thenByDescending { it.createdAt })
+    private fun toggleDone(task: TaskEntry) {
+        val idx = tasks.indexOfFirst { it.id == task.id }
+        if (idx < 0) return
+        val old = tasks[idx]
+        val now = System.currentTimeMillis()
+        val goingDone = !old.done
+        tasks[idx] = old.copy(done = goingDone)
 
-        val openCount = tasks.count { !it.done }
-        val doneCount = tasks.count { it.done }
-        val q1 = tasks.count { !it.done && quadrantOf(it) == "Q1" }
-        val q2 = tasks.count { !it.done && quadrantOf(it) == "Q2" }
-        val q3 = tasks.count { !it.done && quadrantOf(it) == "Q3" }
-        val q4 = tasks.count { !it.done && quadrantOf(it) == "Q4" }
-        val recurring = tasks.count { !it.done && it.recurrenceDays > 0 }
-        statsText.text = "Total ${tasks.size} • Open $openCount • Done $doneCount • Q1:$q1 Q2:$q2 Q3:$q3 Q4:$q4 • Recur:$recurring • Filter ${activeFilter.name}"
+        if (goingDone && old.recurrenceDays > 0) {
+            val nextDueBase = if (old.dueAt > now) old.dueAt else now
+            val nextDue = nextDueBase + old.recurrenceDays * 86_400_000L
+            tasks.add(0, old.copy(
+                id = now + idx,
+                done = false,
+                dueAt = nextDue,
+                createdAt = now
+            ))
+        }
 
-        if (filtered.isEmpty()) {
-            taskListContainer.addView(TextView(this).apply {
-                text = "No missions for this filter."
-                setTextColor(0xFFAAAAAA.toInt())
-                textSize = 14f
-            })
+        saveTasks()
+        renderDashboard()
+    }
+
+    private fun showTaskListDialog() {
+        val open = tasks.filter { !it.done }
+            .sortedWith(compareBy<TaskEntry> { it.priority }.thenBy { it.dueAt.takeIf { d -> d > 0 } ?: Long.MAX_VALUE })
+
+        if (open.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("Open Tasks")
+                .setMessage("No open tasks. Nice work.")
+                .setPositiveButton("OK", null)
+                .show()
             return
         }
 
-        filtered.forEachIndexed { idx, task ->
-            val q = quadrantOf(task)
-            val dueText = dueLabel(task)
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                setPadding(12, 12, 12, 12)
-                setBackgroundColor(if (task.done) 0xFF1F3A2A.toInt() else 0xFF242424.toInt())
-            }
+        val labels = open.map { t ->
+            val pr = when (t.priority) { 1 -> "[H]"; 3 -> "[L]"; else -> "[N]" }
+            "$pr ${t.title}${if (t.urgent) " • urgent" else ""}"
+        }.toTypedArray()
 
-            val tv = TextView(this).apply {
-                val pText = when (task.priority) { 1 -> "[H]"; 3 -> "[L]"; else -> "[N]" }
-                val urgentText = if (task.urgent) "[U]" else ""
-                val recurText = if (task.recurrenceDays > 0) " • repeats ${task.recurrenceDays}d" else ""
-                text = "${idx + 1}. $pText$urgentText [$q] ${task.title}$dueText$recurText"
-                textSize = 14f
-                setTextColor(0xFFFFFFFF.toInt())
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            }
-
-            val doneBtn = Button(this).apply {
-                text = if (task.done) "Undo" else "Done"
-                isAllCaps = false
-                setOnClickListener {
-                    val index = tasks.indexOfFirst { it.id == task.id }
-                    if (index >= 0) {
-                        val old = tasks[index]
-                        val now = System.currentTimeMillis()
-                        val goingDone = !old.done
-                        tasks[index] = old.copy(done = goingDone)
-                        if (goingDone && old.recurrenceDays > 0) {
-                            val nextDueBase = if (old.dueAt > now) old.dueAt else now
-                            val nextDue = nextDueBase + (old.recurrenceDays * 86_400_000L)
-                            tasks.add(0, old.copy(
-                                id = now + index,
-                                done = false,
-                                dueAt = nextDue,
-                                createdAt = now
-                            ))
-                        }
-                    }
-                    saveTasks()
-                    renderTasks()
-                }
-            }
-
-            val deleteBtn = Button(this).apply {
-                text = "Delete"
-                isAllCaps = false
-                setOnClickListener {
-                    tasks.removeAll { it.id == task.id }
-                    saveTasks()
-                    renderTasks()
-                }
-            }
-
-            val dupBtn = Button(this).apply {
-                text = "Duplicate"
-                isAllCaps = false
-                setOnClickListener {
-                    val now = System.currentTimeMillis()
-                    tasks.add(0, task.copy(id = now, done = false, createdAt = now))
-                    saveTasks()
-                    renderTasks()
-                }
-            }
-
-            val topBtn = Button(this).apply {
-                text = "Top"
-                isAllCaps = false
-                setOnClickListener {
-                    val index = tasks.indexOfFirst { it.id == task.id }
-                    if (index > 0) {
-                        val item = tasks.removeAt(index)
-                        tasks.add(0, item)
-                        saveTasks()
-                        renderTasks()
-                    }
-                }
-            }
-
-            row.addView(tv)
-            row.addView(topBtn)
-            row.addView(dupBtn)
-            row.addView(doneBtn)
-            row.addView(deleteBtn)
-
-            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-            lp.bottomMargin = 10
-            taskListContainer.addView(row, lp)
-        }
-    }
-
-    private fun quadrantOf(task: TaskEntry): String {
-        val important = task.priority == 1
-        val urgent = task.urgent
-        return when {
-            urgent && important -> "Q1"
-            !urgent && important -> "Q2"
-            urgent && !important -> "Q3"
-            else -> "Q4"
-        }
-    }
-
-    private fun dueLabel(task: TaskEntry): String {
-        if (task.dueAt <= 0L) return ""
-        val diff = task.dueAt - System.currentTimeMillis()
-        val days = abs(diff) / 86_400_000L
-        return if (diff >= 0) " • due ${days}d" else " • overdue ${days}d"
+        AlertDialog.Builder(this)
+            .setTitle("Open Tasks")
+            .setItems(labels) { _, which -> showTaskActionDialog(open[which]) }
+            .setPositiveButton("New Task") { _, _ -> showAddTaskDialog() }
+            .setNegativeButton("Close", null)
+            .show()
     }
 
     private fun loadTasks() {
