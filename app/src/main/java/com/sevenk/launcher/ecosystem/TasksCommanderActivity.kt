@@ -11,8 +11,9 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import kotlin.math.abs
 
 class TasksCommanderActivity : AppCompatActivity() {
@@ -229,7 +230,7 @@ class TasksCommanderActivity : AppCompatActivity() {
         val open = tasks.filter { !it.done }
         val percent = if (total == 0) 0 else ((done * 100f) / total).toInt()
         progressRingText.text = "$percent%"
-        performanceText.text = "Open $${open.size} missions • Completed $done of $total"
+        performanceText.text = "Open ${open.size} missions • Completed $done of $total"
 
         renderScheduleCards(open)
         renderTimeline(open)
@@ -362,12 +363,13 @@ class TasksCommanderActivity : AppCompatActivity() {
             addView(titleInput)
             addView(dueInput)
         }
-        AlertDialog.Builder(this)
-            .setTitle("Set Reminder")
-            .setView(holder)
-            .setPositiveButton("Save") { _, _ ->
+        showGlassFormSheet(
+            title = "Set Reminder",
+            content = holder,
+            primaryLabel = "Save"
+        ) {
                 val title = titleInput.text?.toString()?.trim().orEmpty()
-                if (title.isBlank()) return@setPositiveButton
+                if (title.isBlank()) return@showGlassFormSheet
                 val days = dueInput.text?.toString()?.toIntOrNull()?.coerceIn(0, 3650) ?: 1
                 val now = System.currentTimeMillis()
                 tasks.add(0, TaskEntry(
@@ -383,8 +385,6 @@ class TasksCommanderActivity : AppCompatActivity() {
                 saveTasks()
                 renderDashboard()
             }
-            .setNegativeButton("Cancel", null)
-            .show()
     }
 
     private fun showAddTaskDialog(existing: TaskEntry? = null) {
@@ -425,12 +425,13 @@ class TasksCommanderActivity : AppCompatActivity() {
             addView(recurrenceInput)
         }
 
-        AlertDialog.Builder(this)
-            .setTitle(if (existing == null) "New Task" else "Edit Task")
-            .setView(holder)
-            .setPositiveButton("Save") { _, _ ->
+        showGlassFormSheet(
+            title = if (existing == null) "New Task" else "Edit Task",
+            content = holder,
+            primaryLabel = "Save"
+        ) {
                 val value = input.text?.toString()?.trim().orEmpty()
-                if (value.isBlank()) return@setPositiveButton
+                if (value.isBlank()) return@showGlassFormSheet
                 val now = System.currentTimeMillis()
                 val p = priorityInput.text?.toString()?.toIntOrNull()?.coerceIn(1, 3) ?: 2
                 val urgent = urgentInput.text?.toString()?.trim()?.lowercase()?.startsWith("y") == true
@@ -455,8 +456,6 @@ class TasksCommanderActivity : AppCompatActivity() {
                 saveTasks()
                 renderDashboard()
             }
-            .setNegativeButton("Cancel", null)
-            .show()
     }
 
     private fun showTaskActionDialog(task: TaskEntry) {
@@ -466,10 +465,9 @@ class TasksCommanderActivity : AppCompatActivity() {
         actions.add("Duplicate")
         actions.add("Delete")
 
-        AlertDialog.Builder(this)
-            .setTitle(task.title)
-            .setItems(actions.toTypedArray()) { _, which ->
-                when (actions[which]) {
+        val actionPairs = actions.map { action ->
+            action to {
+                when (action) {
                     "Mark Done", "Undo" -> toggleDone(task)
                     "Edit" -> showAddTaskDialog(task)
                     "Duplicate" -> {
@@ -485,8 +483,8 @@ class TasksCommanderActivity : AppCompatActivity() {
                     }
                 }
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+        }
+        showGlassActionSheet(task.title, actionPairs)
     }
 
     private fun toggleDone(task: TaskEntry) {
@@ -517,11 +515,11 @@ class TasksCommanderActivity : AppCompatActivity() {
             .sortedWith(compareBy<TaskEntry> { it.priority }.thenBy { it.dueAt.takeIf { d -> d > 0 } ?: Long.MAX_VALUE })
 
         if (open.isEmpty()) {
-            AlertDialog.Builder(this)
-                .setTitle("Open Tasks")
-                .setMessage("No open tasks. Nice work.")
-                .setPositiveButton("OK", null)
-                .show()
+            showGlassMessageSheet(
+                title = "Open Tasks",
+                message = "No open tasks. Nice work.",
+                primaryLabel = "OK"
+            )
             return
         }
 
@@ -530,13 +528,166 @@ class TasksCommanderActivity : AppCompatActivity() {
             "$pr ${t.title}${if (t.urgent) " • urgent" else ""}"
         }.toTypedArray()
 
-        AlertDialog.Builder(this)
-            .setTitle("Open Tasks")
-            .setItems(labels) { _, which -> showTaskActionDialog(open[which]) }
-            .setPositiveButton("New Task") { _, _ -> showAddTaskDialog() }
-            .setNegativeButton("Close", null)
-            .show()
+        val listActions = labels.mapIndexed { idx, label ->
+            label to { showTaskActionDialog(open[idx]) }
+        }.toMutableList()
+        listActions.add("+ New Task" to { showAddTaskDialog() })
+        showGlassActionSheet("Open Tasks", listActions)
     }
+
+    private fun showGlassFormSheet(
+        title: String,
+        content: LinearLayout,
+        primaryLabel: String,
+        onPrimary: () -> Unit
+    ) {
+        val sheet = BottomSheetDialog(this)
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(20))
+            setBackgroundColor(0xFF1B1730.toInt())
+        }
+        val titleView = TextView(this).apply {
+            text = title
+            textSize = 18f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(8), dp(4), dp(8), dp(12))
+        }
+        root.addView(titleView)
+
+        styleFormInputs(content)
+        val contentLp = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(12) }
+        root.addView(content, contentLp)
+
+        val save = TextView(this).apply {
+            text = primaryLabel
+            textSize = 15f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            setBackgroundColor(0xFF6C4BFF.toInt())
+            foreground = AppCompatResources.getDrawable(this@TasksCommanderActivity, android.R.drawable.list_selector_background)
+            setOnClickListener {
+                onPrimary()
+                sheet.dismiss()
+            }
+        }
+        root.addView(save)
+
+        val cancel = TextView(this).apply {
+            text = "Cancel"
+            textSize = 14f
+            setTextColor(0xFF80CBC4.toInt())
+            gravity = Gravity.CENTER
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            setOnClickListener { sheet.dismiss() }
+        }
+        root.addView(cancel)
+
+        sheet.setContentView(root)
+        sheet.show()
+    }
+
+    private fun showGlassActionSheet(title: String, actions: List<Pair<String, () -> Unit>>) {
+        val sheet = BottomSheetDialog(this)
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(20))
+            setBackgroundColor(0xFF1B1730.toInt())
+        }
+        val titleView = TextView(this).apply {
+            text = title
+            textSize = 18f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(8), dp(4), dp(8), dp(12))
+        }
+        root.addView(titleView)
+
+        actions.forEach { (label, onClick) ->
+            val item = TextView(this).apply {
+                text = label
+                textSize = 15f
+                setTextColor(0xFFFFFFFF.toInt())
+                setPadding(dp(16), dp(14), dp(16), dp(14))
+                setBackgroundColor(0xFF2A235F.toInt())
+                foreground = AppCompatResources.getDrawable(this@TasksCommanderActivity, android.R.drawable.list_selector_background)
+                setOnClickListener {
+                    sheet.dismiss()
+                    onClick.invoke()
+                }
+            }
+            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                bottomMargin = dp(8)
+            }
+            root.addView(item, lp)
+        }
+
+        val cancel = TextView(this).apply {
+            text = "Close"
+            textSize = 14f
+            setTextColor(0xFF80CBC4.toInt())
+            gravity = Gravity.CENTER
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            setOnClickListener { sheet.dismiss() }
+        }
+        root.addView(cancel)
+
+        sheet.setContentView(root)
+        sheet.show()
+    }
+
+    private fun showGlassMessageSheet(title: String, message: String, primaryLabel: String) {
+        val sheet = BottomSheetDialog(this)
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(20))
+            setBackgroundColor(0xFF1B1730.toInt())
+        }
+        root.addView(TextView(this).apply {
+            text = title
+            textSize = 18f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(8), dp(4), dp(8), dp(8))
+        })
+        root.addView(TextView(this).apply {
+            text = message
+            textSize = 14f
+            setTextColor(0xFFEDE7F6.toInt())
+            setBackgroundColor(0xFF2A235F.toInt())
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+        })
+        root.addView(TextView(this).apply {
+            text = primaryLabel
+            textSize = 15f
+            setTextColor(0xFFFFFFFF.toInt())
+            gravity = Gravity.CENTER
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            setOnClickListener { sheet.dismiss() }
+        })
+        sheet.setContentView(root)
+        sheet.show()
+    }
+
+    private fun styleFormInputs(container: LinearLayout) {
+        for (i in 0 until container.childCount) {
+            val child = container.getChildAt(i)
+            if (child is EditText) {
+                child.setTextColor(0xFFFFFFFF.toInt())
+                child.setHintTextColor(0x99FFFFFF.toInt())
+                child.setBackgroundColor(0xFF2A235F.toInt())
+                child.setPadding(dp(12), dp(10), dp(12), dp(10))
+                val lp = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = dp(8) }
+                child.layoutParams = lp
+            }
+        }
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun loadTasks() {
         val raw = prefs.getString("tasks", "") ?: ""

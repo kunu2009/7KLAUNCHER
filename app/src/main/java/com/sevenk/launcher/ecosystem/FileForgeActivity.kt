@@ -8,8 +8,9 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import java.io.File
 
 class FileForgeActivity : AppCompatActivity() {
@@ -137,10 +138,11 @@ class FileForgeActivity : AppCompatActivity() {
 
     private fun showCreateFileDialog() {
         val input = EditText(this).apply { hint = "example: project_ideas" }
-        AlertDialog.Builder(this)
-            .setTitle("Create file")
-            .setView(input)
-            .setPositiveButton("Create") { _, _ ->
+        showGlassInputSheet(
+            title = "Create file",
+            input = input,
+            primaryLabel = "Create"
+        ) {
                 val base = input.text?.toString()?.trim().orEmpty()
                 if (base.isNotBlank()) {
                     val file = File(vaultDir, "$base.txt")
@@ -151,9 +153,7 @@ class FileForgeActivity : AppCompatActivity() {
                     }
                     renderFiles()
                 }
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+        }
     }
 
     private fun renderFiles() {
@@ -272,25 +272,26 @@ class FileForgeActivity : AppCompatActivity() {
             setText(file.readText())
             minLines = 8
         }
-        AlertDialog.Builder(this)
-            .setTitle(file.name)
-            .setView(input)
-            .setPositiveButton("Save") { _, _ ->
+        showGlassInputSheet(
+            title = file.name,
+            input = input,
+            primaryLabel = "Save",
+            secondaryLabel = "Close"
+        ) {
                 file.writeText(input.text?.toString().orEmpty())
                 renderFiles()
-            }
-            .setNegativeButton("Close", null)
-            .show()
+        }
     }
 
     private fun showRenameDialog(file: File) {
         val input = EditText(this).apply {
             setText(file.nameWithoutExtension)
         }
-        AlertDialog.Builder(this)
-            .setTitle("Rename file")
-            .setView(input)
-            .setPositiveButton("Save") { _, _ ->
+        showGlassInputSheet(
+            title = "Rename file",
+            input = input,
+            primaryLabel = "Save"
+        ) {
                 val base = input.text?.toString()?.trim().orEmpty()
                 if (base.isNotBlank()) {
                     val target = File(vaultDir, "$base.txt")
@@ -302,9 +303,7 @@ class FileForgeActivity : AppCompatActivity() {
                         renderFiles()
                     }
                 }
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+        }
     }
 
     private fun metaOf(file: File): FileMeta = metaByName[file.name] ?: FileMeta(false, emptySet())
@@ -320,10 +319,11 @@ class FileForgeActivity : AppCompatActivity() {
             hint = "comma,separated,tags"
             setText(metaOf(file).tags.joinToString(","))
         }
-        AlertDialog.Builder(this)
-            .setTitle("Edit tags")
-            .setView(input)
-            .setPositiveButton("Save") { _, _ ->
+        showGlassInputSheet(
+            title = "Edit tags",
+            input = input,
+            primaryLabel = "Save"
+        ) {
                 val tags = input.text?.toString().orEmpty()
                     .split(',')
                     .map { it.trim() }
@@ -333,10 +333,72 @@ class FileForgeActivity : AppCompatActivity() {
                 metaByName[file.name] = old.copy(tags = tags)
                 saveMeta()
                 renderFiles()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+        }
     }
+
+    private fun showGlassInputSheet(
+        title: String,
+        input: EditText,
+        primaryLabel: String,
+        secondaryLabel: String = "Cancel",
+        onPrimary: () -> Unit
+    ) {
+        val sheet = BottomSheetDialog(this)
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(20))
+            setBackgroundColor(0xFF202020.toInt())
+        }
+
+        root.addView(TextView(this).apply {
+            text = title
+            textSize = 18f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(8), dp(4), dp(8), dp(12))
+        })
+
+        input.setTextColor(0xFFFFFFFF.toInt())
+        input.setHintTextColor(0xFF9E9E9E.toInt())
+        input.setBackgroundColor(0xFF2A2A2A.toInt())
+        input.setPadding(dp(12), dp(10), dp(12), dp(10))
+        val inputLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            bottomMargin = dp(12)
+        }
+        root.addView(input, inputLp)
+
+        root.addView(TextView(this).apply {
+            text = primaryLabel
+            textSize = 15f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            setBackgroundColor(0xFF6C4BFF.toInt())
+            foreground = AppCompatResources.getDrawable(this@FileForgeActivity, android.R.drawable.list_selector_background)
+            setOnClickListener {
+                onPrimary()
+                sheet.dismiss()
+            }
+        })
+
+        root.addView(TextView(this).apply {
+            text = secondaryLabel
+            textSize = 14f
+            setTextColor(0xFF80CBC4.toInt())
+            gravity = android.view.Gravity.CENTER
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            setOnClickListener { sheet.dismiss() }
+        })
+
+        sheet.setContentView(root)
+        sheet.setOnShowListener {
+            input.requestFocus()
+            input.setSelection(input.text?.length ?: 0)
+            val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+            imm?.showSoftInput(input, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        }
+        sheet.show()
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun loadMeta() {
         val raw = prefs.getString("file_meta", "") ?: ""
