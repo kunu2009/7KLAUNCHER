@@ -177,6 +177,13 @@
                     android:layout_height="wrap_content"
                     android:text="Infinite scroll" />
 
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/homeLockSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Lock home layout (prevent edits)"
+                    android:layout_marginTop="12dp" />
+
             </LinearLayout>
 
         </com.google.android.material.card.MaterialCardView>

@@ -64,6 +64,10 @@ Milestones: `M1 Core Reliability` → `M2 Power Features` → `M3 Premium Polish
 - ✅ Launcher UX uplift: `SettingsActivity` multi-select app management (`Manage Hidden/Dock/Sidebar Apps`) migrated from generic multi-choice alert dialog to custom glass multi-select sheet.
 - ✅ Launcher UX uplift: `SettingsActivity` preloaded wallpaper picker migrated from generic list alert dialog to custom glass action sheet.
 - ✅ Spinner modernization: `AppPrivacyActivity`, `GestureSettingsActivity`, and `EnhancedSettingsActivity` now use custom glass spinner item/dropdown layouts instead of `android.R.layout.simple_spinner_*`.
+- ✅ LCH-003 regression fix: Home long-press fallback is now scope-aware (restricted to home pager area) and no longer triggers from dock/sidebar or app-icon long-press interactions.
+- ✅ LCH-003 regression fix: Drag-drop from drawer to Home now force-hides drawer immediately during drag and applies target-first move logic, restoring reliable drop behavior.
+- ✅ LCH-003 responsive polish: Home grid + right insets now adapt to screen width and sidebar visibility to reduce icon-cell distortion on compact devices.
+- ✅ Dock readability polish: Dock/sidebar labels now support centered multi-line rendering and dock height now scales with compact-screen heuristics to reduce clipping.
 
 UI/UX master framework file added:
 - `7k apps documentation/7K_UI_UX_Master_Framework.mf`
@@ -98,10 +102,8 @@ Status: `Open` (prioritized)
 ### P0 — Launcher core surfaces
 
 - `app/src/main/java/com/sevenk/launcher/LauncherActivity.kt`
-  - `homeScreen.setOnLongClickListener` still uses `AlertDialog.Builder` Home Options menu.
-  - `homePager.setOnLongClickListener` still uses `AlertDialog.Builder` Home Options menu.
-  - `showAddDialog(app)` still uses `AlertDialog.Builder` action list.
-  - `openAppPicker(forDock)` still uses `AlertDialog.Builder.setMultiChoiceItems`.
+  - (completed in prior waves) Home options / add-surface / dock-sidebar editor are now custom glass sheets.
+  - (completed in current wave) home long-press trigger is now scoped to home-page region to avoid cross-surface misfires.
 
 ### P1 — Main launcher feature pages
 

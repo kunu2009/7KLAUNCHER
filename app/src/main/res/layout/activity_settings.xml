@@ -412,6 +412,12 @@
             android:layout_height="wrap_content"
             android:text="@string/wallpaper_parallax" />
 
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/swHomeLock"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Lock Home Layout (prevent edits)" />
+
         <!-- Competitive Features Section -->
         <TextView
             android:layout_width="wrap_content"

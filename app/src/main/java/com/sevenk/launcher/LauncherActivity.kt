@@ -888,8 +888,17 @@ class LauncherActivity : AppCompatActivity() {
 
 // Expose drop targets by hiding the drawer when a drag begins from the app drawer
 fun onAppDragStart() {
-    // Close the app drawer to reveal dock/sidebar/home for dropping
-    toggleAppDrawer(false)
+    // Hide drawer immediately during drag so drop targets stay hittable.
+    try {
+        appDrawerContainer.clearAnimation()
+        appDrawerContainer.animate().cancel()
+        appDrawerContainer.translationY = 0f
+        appDrawerContainer.alpha = 1f
+        appDrawerContainer.visibility = View.GONE
+    } catch (_: Throwable) {
+        // Fallback if immediate hide fails
+        toggleAppDrawer(false)
+    }
 }
 
 // Context actions for a sidebar item (covers both pinned and recents)
@@ -1916,7 +1925,10 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
 
                     override fun onLongPress(e: MotionEvent) {
                         try {
-                            if (::appDrawerContainer.isInitialized && appDrawerContainer.visibility != View.VISIBLE) {
+                            if (::appDrawerContainer.isInitialized &&
+                                appDrawerContainer.visibility != View.VISIBLE &&
+                                shouldTriggerHomeLongPress(e)
+                            ) {
                                 showHomeOptions()
                             }
                         } catch (_: Throwable) {}
@@ -1982,27 +1994,19 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                     true
                 }
 
-                // Long-press on empty home to open quick actions
-                homeScreen.setOnLongClickListener {
-                    showHomeOptions()
-                    true
-                }
-
-                // Also support long-press directly on the pager area (pages can consume touches)
-                homePager.setOnLongClickListener {
-                    showHomeOptions()
-                    true
-                }
-
                 // Forward touch events to gesture detector but DO NOT consume them,
                 homeScreen.isLongClickable = true
                 homePager.isLongClickable = true
                 homeScreen.setOnTouchListener { _, ev ->
-                    gestureDetector.onTouchEvent(ev)
+                    if (!isTouchInSidebar(ev) && !isTouchInView(ev.rawX, ev.rawY, dock)) {
+                        gestureDetector.onTouchEvent(ev)
+                    }
                     false
                 }
                 homePager.setOnTouchListener { _, ev ->
-                    gestureDetector.onTouchEvent(ev)
+                    if (!isTouchInSidebar(ev) && !isTouchInView(ev.rawX, ev.rawY, dock)) {
+                        gestureDetector.onTouchEvent(ev)
+                    }
                     false
                 }
             } catch (e: Exception) {
@@ -2343,8 +2347,15 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
         val lp = dock.layoutParams
         val iconPx = getDockIconSizePx()
         val hasLabels = isShowLabels()
-        val labelAllowance = if (hasLabels) dp(24) else 0
-        val verticalPadding = dp(16)
+        val dm = resources.displayMetrics
+        val shortestDp = (minOf(dm.widthPixels, dm.heightPixels) / dm.density).toInt()
+        val compactScreen = shortestDp < 360
+        val labelAllowance = when {
+            !hasLabels -> 0
+            compactScreen -> dp(18)
+            else -> dp(28)
+        }
+        val verticalPadding = if (compactScreen) dp(10) else dp(16)
         lp.height = iconPx + labelAllowance + verticalPadding
         dock.layoutParams = lp
     }
@@ -2518,27 +2529,34 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                     if (pkg.isEmpty()) return@OnDragListener false
                     when (v) {
                         dock -> {
-                            removeFromList(KEY_DOCK, pkg)
+                            // Add to target first, then clean up other surfaces.
+                            addToList(KEY_DOCK, pkg)
                             removeFromList(KEY_SIDEBAR, pkg)
                             removeFromAllHomePages(pkg)
-                            addToList(KEY_DOCK, pkg)
                             rebuildDock()
+                            rebuildSidebar()
+                            refreshHomePages()
                             true
                         }
                         sidebar -> {
-                            removeFromList(KEY_DOCK, pkg)
-                            removeFromList(KEY_SIDEBAR, pkg)
-                            removeFromAllHomePages(pkg)
                             addToList(KEY_SIDEBAR, pkg)
+                            removeFromList(KEY_DOCK, pkg)
+                            removeFromAllHomePages(pkg)
+                            rebuildDock()
                             rebuildSidebar()
+                            refreshHomePages()
                             true
                         }
                         homeScreen, homePager -> {
-                            removeFromList(KEY_DOCK, pkg)
-                            removeFromList(KEY_SIDEBAR, pkg)
-                            removeFromAllHomePages(pkg)
                             val contentIndex = (homePager.currentItem - 2).coerceIn(0, NORMAL_HOME_PAGES - 1)
                             addToHomePage(contentIndex, pkg)
+                            removeFromList(KEY_DOCK, pkg)
+                            removeFromList(KEY_SIDEBAR, pkg)
+                            for (page in 0 until getNormalHomePages()) {
+                                if (page != contentIndex) removeFromHomePage(page, pkg)
+                            }
+                            rebuildDock()
+                            rebuildSidebar()
                             refreshHomePages()
                             true
                         }
@@ -3077,7 +3095,32 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
 
     // Public methods for accessing private members from fragments
     fun getCurrentHomePage(): Int {
-        return if (::homePager.isInitialized) homePager.currentItem - 1 else -1
+        // Positions: 0=TODO, 1=Stan, content pages start at 2.
+        return if (::homePager.isInitialized) {
+            (homePager.currentItem - 2).coerceIn(0, NORMAL_HOME_PAGES - 1)
+        } else {
+            0
+        }
+    }
+
+    private fun shouldTriggerHomeLongPress(event: MotionEvent): Boolean {
+        if (!::homePager.isInitialized) return false
+        val x = event.rawX
+        val y = event.rawY
+        return isTouchInView(x, y, homePager) &&
+            !isTouchInView(x, y, dock) &&
+            !isTouchInView(x, y, sidebar)
+    }
+
+    private fun isTouchInView(rawX: Float, rawY: Float, view: View?): Boolean {
+        if (view == null || view.visibility != View.VISIBLE || view.width <= 0 || view.height <= 0) return false
+        val loc = IntArray(2)
+        view.getLocationOnScreen(loc)
+        val left = loc[0].toFloat()
+        val top = loc[1].toFloat()
+        val right = left + view.width
+        val bottom = top + view.height
+        return rawX in left..right && rawY in top..bottom
     }
 
     fun rebuildSidebarPublic() {

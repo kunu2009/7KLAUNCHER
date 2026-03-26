@@ -38,8 +38,24 @@ class HomePageFragment : Fragment() {
         pageWidgetsContainer = view.findViewById<FrameLayout>(R.id.pageWidgetsContainer)
         // Apply user-configured home grid columns
         val prefs = requireContext().getSharedPreferences("sevenk_launcher_prefs", Context.MODE_PRIVATE)
-        val homeCols = prefs.getInt("home_columns", 4).coerceIn(3, 6)
+        val widthDp = resources.configuration.screenWidthDp
+        val maxCols = when {
+            widthDp < 360 -> 4
+            widthDp < 420 -> 5
+            else -> 6
+        }
+        val homeCols = prefs.getInt("home_columns", 4).coerceIn(3, maxCols)
         recycler.layoutManager = GridLayoutManager(requireContext(), homeCols)
+
+        // Responsive right padding for sidebar reservation (avoid over-shrinking icons on compact screens).
+        val showSidebar = prefs.getBoolean("show_sidebar", true)
+        val rightPad = when {
+            !showSidebar -> dp(20)
+            widthDp < 360 -> dp(64)
+            else -> dp(96)
+        }
+        recycler.setPadding(dp(16), dp(72), rightPad, dp(120))
+        pageWidgetsContainer?.setPadding(dp(16), dp(72), rightPad, dp(120))
         // Ensure long-press anywhere on the page can open Home Options
         view.isLongClickable = true
         view.setOnLongClickListener {

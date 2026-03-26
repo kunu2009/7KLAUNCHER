@@ -97,6 +97,8 @@ class HomePageAdapter(
                 h.icon.setImageBitmap(bmp)
                 h.name.text = app.name
                 h.itemView.setOnClickListener { onAppClick(app) }
+                // Consume framework long-click so parent page long-click does not fire.
+                h.itemView.setOnLongClickListener { true }
                 // Long-press-then-drag vs long-press-without-move
                 val vc = android.view.ViewConfiguration.get(h.itemView.context)
                 val touchSlop = vc.scaledTouchSlop

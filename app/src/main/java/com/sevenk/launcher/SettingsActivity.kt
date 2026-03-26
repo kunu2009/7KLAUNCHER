@@ -99,6 +99,7 @@ class SettingsActivity : AppCompatActivity() {
         val tvDockOpacityValue = findViewById<TextView>(R.id.tvDockOpacityValue)
         val swPageDots = findViewById<CompoundButton>(R.id.swPageDots)
         val swParallax = findViewById<CompoundButton>(R.id.swParallax)
+        val swHomeLock = findViewById<CompoundButton>(R.id.swHomeLock)
         val swSearchApps = findViewById<CompoundButton>(R.id.swSearchApps)
         val swSearchContacts = findViewById<CompoundButton>(R.id.swSearchContacts)
         val swSearchWeb = findViewById<CompoundButton>(R.id.swSearchWeb)
@@ -204,6 +205,7 @@ class SettingsActivity : AppCompatActivity() {
         // Home experience
         swPageDots.isChecked = prefs.getBoolean("show_page_dots", true)
         swParallax.isChecked = prefs.getBoolean("wallpaper_parallax", false)
+        swHomeLock.isChecked = prefs.getBoolean("home_locked", false)
         // Search sources
         swSearchApps.isChecked = prefs.getBoolean("search_src_apps", true)
         swSearchContacts.isChecked = prefs.getBoolean("search_src_contacts", false)
@@ -284,6 +286,14 @@ class SettingsActivity : AppCompatActivity() {
         }
         swParallax.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("wallpaper_parallax", isChecked).apply()
+        }
+        swHomeLock.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("home_locked", isChecked).apply()
+            Toast.makeText(
+                this,
+                if (isChecked) "Home layout locked" else "Home layout unlocked",
+                Toast.LENGTH_SHORT
+            ).show()
         }
         swSearchApps.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("search_src_apps", isChecked).apply()
