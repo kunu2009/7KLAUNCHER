@@ -51,6 +51,10 @@ Milestones: `M1 Core Reliability` → `M2 Power Features` → `M3 Premium Polish
 - ✅ UX polish: `LauncherActivity` P0 dialog migration completed — Home long-press options, add-surface dialog, and dock/sidebar editor now use custom glass sheets.
 - ✅ UX polish: `GestureSettingsActivity` launch-app target picker now uses a custom glass action sheet.
 - ✅ UX polish: `TodoPageFragment` add/edit task flow now uses a custom glass input sheet (no generic alert input dialog).
+- ✅ LCH-002 reliability fix: Widget bind/configure result handling now falls back to pending widget ID and clears pending state, fixing cases where widget permission succeeds but widget does not render.
+- ✅ LCH-003 reliability fix: Drag/drop drop-to-home index corrected for special pages and move-removal is now target-safe (prevents app disappearance on failed/invalid drop).
+- ✅ Dock/Sidebar UX fix: Dock item rendering now uses dedicated compact layout + dynamic icon view sizing; dock height now scales with icon size and label visibility to prevent icon cropping/truncation.
+- ✅ Home interaction fix: Added robust long-press fallback via gesture detector to reliably open Home Options.
 
 UI/UX master framework file added:
 - `7k apps documentation/7K_UI_UX_Master_Framework.mf`

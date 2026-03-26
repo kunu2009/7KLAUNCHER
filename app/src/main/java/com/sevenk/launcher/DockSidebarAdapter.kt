@@ -36,13 +36,17 @@ class DockSidebarAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-        val v = LayoutInflater.from(parent.context).inflate(R.layout.app_icon, parent, false)
+        val v = LayoutInflater.from(parent.context).inflate(R.layout.dock_sidebar_icon, parent, false)
         return VH(v)
     }
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val app = items[position]
         val size = iconSizePx ?: holder.itemView.resources.getDimensionPixelSize(R.dimen.icon_size)
+        holder.icon.layoutParams = holder.icon.layoutParams.apply {
+            width = size
+            height = size
+        }
         val ctx = holder.itemView.context
         val bmp = try {
             val defaultIcon = IconCache.getBitmapForPackage(ctx, app.packageName, size)

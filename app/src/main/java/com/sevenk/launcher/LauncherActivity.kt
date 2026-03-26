@@ -1913,6 +1913,14 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                         // Disable onScroll for app drawer control to prevent conflicts
                         return false
                     }
+
+                    override fun onLongPress(e: MotionEvent) {
+                        try {
+                            if (::appDrawerContainer.isInitialized && appDrawerContainer.visibility != View.VISIBLE) {
+                                showHomeOptions()
+                            }
+                        } catch (_: Throwable) {}
+                    }
                 })
                 android.util.Log.d("LauncherActivity", "Gesture detector setup completed")
             } catch (e: Exception) {
@@ -2333,9 +2341,11 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
     private fun applyDockDimensions() {
         // Adjust dock height based on icon size preset
         val lp = dock.layoutParams
-        val iconMode = prefs.getInt("dock_icon_size", 1).coerceIn(0, 2)
-        val targetDp = when (iconMode) { 0 -> 64; 2 -> 84; else -> 72 }
-        lp.height = dp(targetDp)
+        val iconPx = getDockIconSizePx()
+        val hasLabels = isShowLabels()
+        val labelAllowance = if (hasLabels) dp(24) else 0
+        val verticalPadding = dp(16)
+        lp.height = iconPx + labelAllowance + verticalPadding
         dock.layoutParams = lp
     }
 
@@ -2506,23 +2516,28 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                     val item = event.clipData?.getItemAt(0)
                     val pkg = item?.text?.toString()?.trim().orEmpty()
                     if (pkg.isEmpty()) return@OnDragListener false
-                    // Move semantics: remove from all other places first to avoid duplicates
-                    removeFromList(KEY_DOCK, pkg)
-                    removeFromList(KEY_SIDEBAR, pkg)
-                    removeFromAllHomePages(pkg)
                     when (v) {
                         dock -> {
+                            removeFromList(KEY_DOCK, pkg)
+                            removeFromList(KEY_SIDEBAR, pkg)
+                            removeFromAllHomePages(pkg)
                             addToList(KEY_DOCK, pkg)
                             rebuildDock()
                             true
                         }
                         sidebar -> {
+                            removeFromList(KEY_DOCK, pkg)
+                            removeFromList(KEY_SIDEBAR, pkg)
+                            removeFromAllHomePages(pkg)
                             addToList(KEY_SIDEBAR, pkg)
                             rebuildSidebar()
                             true
                         }
                         homeScreen, homePager -> {
-                            val contentIndex = (homePager.currentItem - 1).coerceIn(0, NORMAL_HOME_PAGES - 1)
+                            removeFromList(KEY_DOCK, pkg)
+                            removeFromList(KEY_SIDEBAR, pkg)
+                            removeFromAllHomePages(pkg)
+                            val contentIndex = (homePager.currentItem - 2).coerceIn(0, NORMAL_HOME_PAGES - 1)
                             addToHomePage(contentIndex, pkg)
                             refreshHomePages()
                             true
@@ -3578,13 +3593,15 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                     prefs.edit().remove(KEY_WIDGET_ID).remove("widget_page_index").apply()
                     return
                 }
-                val appWidgetId = data?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1) ?: -1
+                val appWidgetId = data?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1)
+                    ?: prefs.getInt(KEY_WIDGET_ID, -1)
                 if (appWidgetId != -1) {
                     val pageIndex = prefs.getInt("widget_page_index", 0)
                     // Try to bind if allowed, otherwise request bind
                     val info = appWidgetManager.getAppWidgetInfo(appWidgetId)
                     if (info != null && appWidgetManager.bindAppWidgetIdIfAllowed(appWidgetId, info.profile, info.provider, null)) {
                         configureOrAddWidget(appWidgetId, info.configure, pageIndex)
+                        prefs.edit().remove(KEY_WIDGET_ID).remove("widget_page_index").apply()
                     } else {
                         val bindIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_BIND)
                         bindIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
@@ -3607,12 +3624,14 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                     prefs.edit().remove(KEY_WIDGET_ID).remove("widget_page_index").apply()
                     return
                 }
-                val appWidgetId = data?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1) ?: -1
+                val appWidgetId = data?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1)
+                    ?: prefs.getInt(KEY_WIDGET_ID, -1)
                 if (appWidgetId != -1) {
                     val pageIndex = prefs.getInt("widget_page_index", -1)
                     if (pageIndex != -1) {
                         val info = appWidgetManager.getAppWidgetInfo(appWidgetId)
                         configureOrAddWidget(appWidgetId, info?.configure, pageIndex)
+                        prefs.edit().remove(KEY_WIDGET_ID).remove("widget_page_index").apply()
                     }
                 }
             }
@@ -3626,13 +3645,15 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                     prefs.edit().remove(KEY_WIDGET_ID).remove("widget_page_index").apply()
                     return
                 }
-                val appWidgetId = data?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1) ?: -1
+                val appWidgetId = data?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1)
+                    ?: prefs.getInt(KEY_WIDGET_ID, -1)
                 if (appWidgetId != -1) {
                     val pageIndex = prefs.getInt("widget_page_index", -1)
                     if (pageIndex != -1) {
                         addAppWidget(appWidgetId, pageIndex)
                         // Nudge list data to refresh after config
                         try { appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.listView) } catch (_: Throwable) {}
+                        prefs.edit().remove(KEY_WIDGET_ID).remove("widget_page_index").apply()
                     }
                 }
             }
