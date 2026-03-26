@@ -24,6 +24,39 @@
         android:title="Add to Home screen" />
 
     <item
+        android:id="@+id/action_add_bookmark"
+        android:title="Bookmark this page" />
+
+    <item
+        android:id="@+id/action_manage_bookmarks"
+        android:title="Bookmarks" />
+
+    <item
+        android:id="@+id/action_save_offline"
+        android:title="Save for offline" />
+
+    <item
+        android:id="@+id/action_offline_pages"
+        android:title="Offline pages" />
+
+    <item
+        android:id="@+id/action_tab_groups"
+        android:title="Tab groups" />
+
+    <item
+        android:id="@+id/action_toggle_reader_mode"
+        android:checkable="true"
+        android:title="Reader mode" />
+
+    <item
+        android:id="@+id/action_send_to_notes"
+        android:title="Send to 7K Notes" />
+
+    <item
+        android:id="@+id/action_create_task"
+        android:title="Create task from page" />
+
+    <item
         android:id="@+id/action_settings"
         android:title="Settings" />
 

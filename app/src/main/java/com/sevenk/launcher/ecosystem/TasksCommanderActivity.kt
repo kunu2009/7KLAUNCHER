@@ -10,6 +10,7 @@ import android.widget.GridLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import kotlin.math.abs
@@ -40,6 +41,9 @@ class TasksCommanderActivity : AppCompatActivity() {
         title = "7K Tasks Commander"
 
         loadTasks()
+        if (savedInstanceState == null) {
+            consumeIncomingTaskIntent()
+        }
 
         val root = FrameLayout(this).apply {
             setBackgroundColor(0xFF1D1552.toInt())
@@ -187,6 +191,36 @@ class TasksCommanderActivity : AppCompatActivity() {
 
         setContentView(root)
         renderDashboard()
+    }
+
+    private fun consumeIncomingTaskIntent() {
+        val titleFromIntent = intent?.getStringExtra("prefill_task_title")?.trim().orEmpty()
+        val urlFromIntent = intent?.getStringExtra("prefill_task_url")?.trim().orEmpty()
+        if (titleFromIntent.isBlank()) return
+
+        val now = System.currentTimeMillis()
+        val compactTitle = if (urlFromIntent.isNotBlank()) {
+            val host = runCatching { android.net.Uri.parse(urlFromIntent).host.orEmpty() }.getOrDefault("")
+            if (host.isNotBlank()) "$titleFromIntent • $host" else titleFromIntent
+        } else {
+            titleFromIntent
+        }
+
+        tasks.add(
+            0,
+            TaskEntry(
+                id = now,
+                title = compactTitle,
+                priority = 2,
+                urgent = false,
+                dueAt = 0L,
+                recurrenceDays = 0,
+                done = false,
+                createdAt = now
+            )
+        )
+        saveTasks()
+        Toast.makeText(this, "Task added from 7K Browser", Toast.LENGTH_SHORT).show()
     }
 
     private fun renderDashboard() {

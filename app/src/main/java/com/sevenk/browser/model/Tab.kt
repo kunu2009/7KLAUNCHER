@@ -10,5 +10,7 @@ data class Tab(
     var title: String = "New Tab",
     var url: String = "",
     var isIncognito: Boolean = false,
-    var lastActiveTime: Long = System.currentTimeMillis()
+    var lastActiveTime: Long = System.currentTimeMillis(),
+    var groupName: String = "General",
+    var readerModeEnabled: Boolean = false
 )

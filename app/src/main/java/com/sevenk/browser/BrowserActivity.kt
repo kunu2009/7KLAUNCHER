@@ -13,7 +13,12 @@ import android.view.*
 import android.view.inputmethod.EditorInfo
 import android.webkit.*
 import android.widget.ArrayAdapter
+import android.widget.EditText
 import android.widget.FrameLayout
+import java.io.File
+import java.text.DateFormat
+import org.json.JSONArray
+import org.json.JSONObject
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
@@ -31,8 +36,32 @@ import android.widget.Toast
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.sevenk.launcher.notes.data.NotesRepository
+import com.sevenk.launcher.notes.ui.NoteEditorActivity
+import com.sevenk.launcher.ecosystem.TasksCommanderActivity
 
 class BrowserActivity : AppCompatActivity() {
+
+    companion object {
+        const val ACTION_OPEN_PRIVATE_TAB = "com.sevenk.browser.action.OPEN_PRIVATE_TAB"
+        const val ACTION_OPEN_OFFLINE = "com.sevenk.browser.action.OPEN_OFFLINE"
+        const val EXTRA_URL = "extra_url"
+    }
+
+    private data class OfflinePage(
+        val id: Long,
+        val title: String,
+        val url: String,
+        val savedAt: Long,
+        val archivePath: String
+    )
+
+    private data class BookmarkEntry(
+        val id: Long,
+        val title: String,
+        val url: String,
+        val addedAt: Long
+    )
 
     private lateinit var binding: ActivityBrowserBinding
     private var currentSnackbar: Snackbar? = null
@@ -40,6 +69,7 @@ class BrowserActivity : AppCompatActivity() {
     private val tabs = mutableListOf<Tab>()
     private var currentTabIndex = -1
     private var isIncognitoMode = false
+    private var currentGroupFilter: String? = null
 
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
 
@@ -58,6 +88,8 @@ class BrowserActivity : AppCompatActivity() {
 
     private val suggestions = mutableListOf<String>()
     private lateinit var suggestionsAdapter: ArrayAdapter<String>
+    private val offlinePrefs by lazy { getSharedPreferences("sevenk_browser_offline", MODE_PRIVATE) }
+    private val bookmarksPrefs by lazy { getSharedPreferences("sevenk_browser_bookmarks", MODE_PRIVATE) }
     
     // WebChromeClient for handling browser UI updates
     private val webChromeClient = object : WebChromeClient() {
@@ -133,6 +165,7 @@ class BrowserActivity : AppCompatActivity() {
             val tab = currentTab ?: return
             if (view == tab.webView) {
                 if (!tab.isIncognito) addSuggestion(url ?: "")
+                applyReaderMode(tab.webView, tab.readerModeEnabled)
                 updateUI()
             }
         }
@@ -190,8 +223,14 @@ class BrowserActivity : AppCompatActivity() {
         binding.urlInput.setAdapter(suggestionsAdapter)
         binding.urlInput.threshold = 1
 
-        // Start with one tab
-        openNewTab("https://www.google.com")
+        // Start according to incoming intent (URL, share, quick action)
+        handleIncomingIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIncomingIntent(intent)
     }
 
     // No override of deprecated onBackPressed; using onBackPressedDispatcher above
@@ -208,6 +247,7 @@ class BrowserActivity : AppCompatActivity() {
         binding.toolbar.setBackgroundColor(MaterialColors.getColor(binding.toolbar, colorAttr))
         if (binding.toolbar.menu.size() > 0) {
             binding.toolbar.menu.findItem(R.id.action_desktop_site)?.isChecked = isDesktopMode
+            binding.toolbar.menu.findItem(R.id.action_toggle_reader_mode)?.isChecked = tab.readerModeEnabled
         }
     }
 
@@ -244,6 +284,38 @@ class BrowserActivity : AppCompatActivity() {
             }
             R.id.action_add_to_home -> {
                 showSnackbar("Add to Home screen coming soon")
+                return true
+            }
+            R.id.action_add_bookmark -> {
+                addCurrentPageBookmark()
+                return true
+            }
+            R.id.action_manage_bookmarks -> {
+                showBookmarksDialog()
+                return true
+            }
+            R.id.action_save_offline -> {
+                saveCurrentPageOffline()
+                return true
+            }
+            R.id.action_offline_pages -> {
+                showOfflinePagesDialog()
+                return true
+            }
+            R.id.action_tab_groups -> {
+                showTabGroupsDialog()
+                return true
+            }
+            R.id.action_toggle_reader_mode -> {
+                toggleReaderMode()
+                return true
+            }
+            R.id.action_send_to_notes -> {
+                sendCurrentPageToNotes()
+                return true
+            }
+            R.id.action_create_task -> {
+                createTaskFromCurrentPage()
                 return true
             }
             R.id.action_settings -> {
@@ -295,7 +367,7 @@ class BrowserActivity : AppCompatActivity() {
                     true
                 }
                 R.id.nav_bookmarks -> {
-                    showBookmarks()
+                    showBookmarksDialog()
                     true
                 }
                 R.id.nav_downloads -> {
@@ -323,7 +395,13 @@ class BrowserActivity : AppCompatActivity() {
     }
     
     private fun addNewTab(webView: WebView, url: String) {
-        val tab = Tab(webView = webView, title = "New Tab", url = url, isIncognito = isIncognitoMode)
+        val tab = Tab(
+            webView = webView,
+            title = "New Tab",
+            url = url,
+            isIncognito = isIncognitoMode,
+            groupName = currentTab?.groupName ?: "General"
+        )
         tabs.add(tab)
         currentTabIndex = tabs.size - 1
         
@@ -427,24 +505,387 @@ class BrowserActivity : AppCompatActivity() {
     private fun showTabsDialog() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_tabs, null)
         val recyclerView = dialogView.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.tabsRecyclerView)
+        val displayPairs = tabs.mapIndexed { index, tab -> index to tab }
+            .filter { (_, tab) -> currentGroupFilter == null || tab.groupName == currentGroupFilter }
+
         recyclerView.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
-        recyclerView.adapter = com.sevenk.browser.adapter.TabsAdapter(tabs) { position ->
-            currentTabIndex = position
+        recyclerView.adapter = com.sevenk.browser.adapter.TabsAdapter(displayPairs.map { it.second }) { position ->
+            val actualIndex = displayPairs.getOrNull(position)?.first ?: return@TabsAdapter
+            currentTabIndex = actualIndex
             binding.webContainer.removeAllViews()
-            binding.webContainer.addView(tabs[position].webView)
+            binding.webContainer.addView(tabs[actualIndex].webView)
             updateUI()
         }
+
+        val suffix = currentGroupFilter?.let { " • Group: $it" }.orEmpty()
         MaterialAlertDialogBuilder(this)
-            .setTitle("Tabs (${tabs.size})")
+            .setTitle("Tabs (${displayPairs.size})$suffix")
             .setView(dialogView)
             .setPositiveButton("New Tab") { _, _ -> openNewTab() }
+            .setNeutralButton("Groups") { _, _ -> showTabGroupsDialog() }
             .setNegativeButton("Close", null)
             .show()
     }
     
     private fun showBookmarks() {
-        // TODO: Implement bookmarks functionality
-        showSnackbar("Bookmarks will be implemented in a future update")
+        showBookmarksDialog()
+    }
+
+    private fun addCurrentPageBookmark() {
+        val tab = currentTab ?: return
+        val url = tab.url.trim()
+        if (url.isBlank() || url == "about:blank") {
+            showSnackbar("Open a page first")
+            return
+        }
+        val title = tab.title.ifBlank { url }
+        val now = System.currentTimeMillis()
+        val updated = loadBookmarks().toMutableList().apply {
+            removeAll { it.url == url }
+            add(0, BookmarkEntry(now, title, url, now))
+            while (size > 300) removeLast()
+        }
+        persistBookmarks(updated)
+        showSnackbar("Bookmarked")
+    }
+
+    private fun showBookmarksDialog() {
+        val bookmarks = loadBookmarks()
+        if (bookmarks.isEmpty()) {
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Bookmarks")
+                .setMessage("No bookmarks yet.")
+                .setPositiveButton("OK", null)
+                .show()
+            return
+        }
+        val labels = bookmarks.map { "${it.title}\n${it.url}" }.toTypedArray()
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Bookmarks")
+            .setItems(labels) { _, which -> loadUrl(bookmarks[which].url) }
+            .setNeutralButton("Clear All") { _, _ ->
+                persistBookmarks(emptyList())
+                showSnackbar("Bookmarks cleared")
+            }
+            .setPositiveButton("Add Current") { _, _ -> addCurrentPageBookmark() }
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
+    private fun loadBookmarks(): List<BookmarkEntry> {
+        val raw = bookmarksPrefs.getString("bookmarks_json", "[]") ?: "[]"
+        return runCatching {
+            val arr = JSONArray(raw)
+            buildList {
+                for (i in 0 until arr.length()) {
+                    val obj = arr.optJSONObject(i) ?: continue
+                    add(
+                        BookmarkEntry(
+                            id = obj.optLong("id"),
+                            title = obj.optString("title"),
+                            url = obj.optString("url"),
+                            addedAt = obj.optLong("addedAt")
+                        )
+                    )
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun persistBookmarks(list: List<BookmarkEntry>) {
+        val arr = JSONArray()
+        list.forEach { bookmark ->
+            arr.put(
+                JSONObject()
+                    .put("id", bookmark.id)
+                    .put("title", bookmark.title)
+                    .put("url", bookmark.url)
+                    .put("addedAt", bookmark.addedAt)
+            )
+        }
+        bookmarksPrefs.edit().putString("bookmarks_json", arr.toString()).apply()
+    }
+
+    private fun toggleReaderMode() {
+        val tab = currentTab ?: return
+        tab.readerModeEnabled = !tab.readerModeEnabled
+        applyReaderMode(tab.webView, tab.readerModeEnabled)
+        showSnackbar(if (tab.readerModeEnabled) "Reader mode enabled" else "Reader mode disabled")
+        updateUI()
+    }
+
+    private fun applyReaderMode(webView: WebView, enabled: Boolean) {
+        val js = if (enabled) {
+            """
+            (function() {
+              var old = document.getElementById('sevenk-reader-style');
+              if (old) old.remove();
+              var style = document.createElement('style');
+              style.id = 'sevenk-reader-style';
+              style.innerHTML = 'body{max-width:780px!important;margin:0 auto!important;padding:16px!important;line-height:1.7!important;font-size:18px!important;background:#111!important;color:#f1f1f1!important;}header,footer,nav,aside,form,button,iframe,video,canvas,[role="banner"],[role="navigation"],[role="complementary"],.ads,.ad,.advert{display:none!important;}img{max-width:100%!important;height:auto!important;}';
+              document.head.appendChild(style);
+            })();
+            """.trimIndent()
+        } else {
+            """
+            (function() {
+              var old = document.getElementById('sevenk-reader-style');
+              if (old) old.remove();
+            })();
+            """.trimIndent()
+        }
+        webView.evaluateJavascript(js, null)
+    }
+
+    private fun showTabGroupsDialog() {
+        val tab = currentTab
+        val options = arrayOf(
+            "Assign current tab to group",
+            "Filter tabs by group",
+            "Clear group filter"
+        )
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Tab Groups")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> {
+                        if (tab == null) return@setItems
+                        val input = EditText(this).apply {
+                            hint = "Group name"
+                            setText(tab.groupName)
+                            setSelection(text?.length ?: 0)
+                        }
+                        MaterialAlertDialogBuilder(this)
+                            .setTitle("Set Group")
+                            .setView(input)
+                            .setPositiveButton("Save") { _, _ ->
+                                val value = input.text?.toString()?.trim().orEmpty().ifBlank { "General" }
+                                tab.groupName = value
+                                currentGroupFilter = value
+                                updateUI()
+                                showSnackbar("Moved to group: $value")
+                            }
+                            .setNegativeButton("Cancel", null)
+                            .show()
+                    }
+                    1 -> {
+                        val groups = tabs.map { it.groupName }.distinct().sorted()
+                        if (groups.isEmpty()) {
+                            showSnackbar("No groups yet")
+                            return@setItems
+                        }
+                        MaterialAlertDialogBuilder(this)
+                            .setTitle("Choose Group")
+                            .setItems(groups.toTypedArray()) { _, index ->
+                                currentGroupFilter = groups[index]
+                                showSnackbar("Showing group: ${groups[index]}")
+                                showTabsDialog()
+                            }
+                            .setNegativeButton("Cancel", null)
+                            .show()
+                    }
+                    2 -> {
+                        currentGroupFilter = null
+                        showSnackbar("Showing all tabs")
+                    }
+                }
+            }
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
+    private fun handleIncomingIntent(incoming: Intent?) {
+        val i = incoming ?: run {
+            if (tabs.isEmpty()) openNewTab("https://www.google.com")
+            return
+        }
+
+        when (i.action) {
+            ACTION_OPEN_OFFLINE -> {
+                if (tabs.isEmpty()) openNewTab("about:blank")
+                showOfflinePagesDialog()
+                return
+            }
+            ACTION_OPEN_PRIVATE_TAB -> {
+                if (!isIncognitoMode) toggleIncognito()
+                val privateUrl = i.getStringExtra(EXTRA_URL)
+                if (tabs.isEmpty()) openNewTab(privateUrl ?: "about:blank")
+                else openNewTab(privateUrl ?: "about:blank")
+                return
+            }
+            Intent.ACTION_VIEW -> {
+                val targetUrl = i.dataString ?: i.getStringExtra(EXTRA_URL)
+                if (tabs.isEmpty()) openNewTab(targetUrl ?: "https://www.google.com")
+                else if (!targetUrl.isNullOrBlank()) loadUrl(targetUrl)
+                return
+            }
+            Intent.ACTION_SEND -> {
+                val shared = i.getStringExtra(Intent.EXTRA_TEXT).orEmpty().trim()
+                if (tabs.isEmpty()) openNewTab(if (shared.isNotBlank()) shared else "https://www.google.com")
+                else if (shared.isNotBlank()) loadUrl(shared)
+                return
+            }
+        }
+
+        val explicitUrl = i.getStringExtra(EXTRA_URL)
+        if (tabs.isEmpty()) {
+            openNewTab(explicitUrl ?: "https://www.google.com")
+        } else if (!explicitUrl.isNullOrBlank()) {
+            loadUrl(explicitUrl)
+        }
+    }
+
+    private fun saveCurrentPageOffline() {
+        val tab = currentTab ?: return
+        val webView = tab.webView
+        val url = tab.url.trim()
+        if (url.isBlank() || url == "about:blank") {
+            showSnackbar("Open a page first")
+            return
+        }
+
+        val title = tab.title.ifBlank { url }
+        val dir = File(filesDir, "browser_offline")
+        if (!dir.exists()) dir.mkdirs()
+        val id = System.currentTimeMillis()
+        val file = File(dir, "offline_$id.mht")
+
+        webView.saveWebArchive(file.absolutePath, false) { savedPath ->
+            val actual = savedPath ?: file.absolutePath
+            val page = OfflinePage(
+                id = id,
+                title = title,
+                url = url,
+                savedAt = id,
+                archivePath = actual
+            )
+            val existing = loadOfflinePages().toMutableList().apply {
+                removeAll { it.url == page.url }
+                add(0, page)
+                while (size > 100) removeLast()
+            }
+            persistOfflinePages(existing)
+            showSnackbar("Saved offline")
+        }
+    }
+
+    private fun showOfflinePagesDialog() {
+        val pages = loadOfflinePages()
+        if (pages.isEmpty()) {
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Offline Pages")
+                .setMessage("No saved pages yet.")
+                .setPositiveButton("OK", null)
+                .show()
+            return
+        }
+
+        val dateFormat = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+        val labels = pages.map {
+            "${it.title}\n${dateFormat.format(it.savedAt)}"
+        }.toTypedArray()
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Offline Pages")
+            .setItems(labels) { _, which ->
+                val selected = pages[which]
+                val archiveFile = File(selected.archivePath)
+                if (archiveFile.exists()) {
+                    loadUrl("file://${archiveFile.absolutePath}")
+                } else {
+                    loadUrl(selected.url)
+                }
+            }
+            .setNeutralButton("Clear All") { _, _ ->
+                clearOfflinePages()
+                showSnackbar("Offline pages cleared")
+            }
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
+    private fun clearOfflinePages() {
+        loadOfflinePages().forEach { page ->
+            runCatching {
+                val f = File(page.archivePath)
+                if (f.exists()) f.delete()
+            }
+        }
+        persistOfflinePages(emptyList())
+    }
+
+    private fun sendCurrentPageToNotes() {
+        val tab = currentTab ?: return
+        val url = tab.url.trim()
+        if (url.isBlank() || url == "about:blank") {
+            showSnackbar("Open a page first")
+            return
+        }
+        val title = tab.title.ifBlank { "Saved from 7K Browser" }
+        val content = buildString {
+            append(url)
+            append("\n\nSaved from 7K Browser")
+        }
+        val note = NotesRepository.get(this).createNew(title = title, content = content)
+        NoteEditorActivity.start(this, note.id)
+        showSnackbar("Sent to 7K Notes")
+    }
+
+    private fun createTaskFromCurrentPage() {
+        val tab = currentTab ?: return
+        val url = tab.url.trim()
+        if (url.isBlank() || url == "about:blank") {
+            showSnackbar("Open a page first")
+            return
+        }
+        val host = runCatching { Uri.parse(url).host.orEmpty() }.getOrDefault("")
+        val taskTitle = if (host.isNotBlank()) {
+            "Read: ${tab.title.ifBlank { host }}"
+        } else {
+            "Read: ${tab.title.ifBlank { "Saved page" }}"
+        }
+        startActivity(
+            Intent(this, TasksCommanderActivity::class.java)
+                .putExtra("prefill_task_title", taskTitle)
+                .putExtra("prefill_task_url", url)
+        )
+        showSnackbar("Task sent to 7K Tasks Commander")
+    }
+
+    private fun loadOfflinePages(): List<OfflinePage> {
+        val raw = offlinePrefs.getString("offline_pages_json", "[]") ?: "[]"
+        return runCatching {
+            val arr = JSONArray(raw)
+            buildList {
+                for (i in 0 until arr.length()) {
+                    val obj = arr.optJSONObject(i) ?: continue
+                    add(
+                        OfflinePage(
+                            id = obj.optLong("id"),
+                            title = obj.optString("title"),
+                            url = obj.optString("url"),
+                            savedAt = obj.optLong("savedAt"),
+                            archivePath = obj.optString("archivePath")
+                        )
+                    )
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun persistOfflinePages(list: List<OfflinePage>) {
+        val arr = JSONArray()
+        list.forEach { page ->
+            arr.put(
+                JSONObject()
+                    .put("id", page.id)
+                    .put("title", page.title)
+                    .put("url", page.url)
+                    .put("savedAt", page.savedAt)
+                    .put("archivePath", page.archivePath)
+            )
+        }
+        offlinePrefs.edit().putString("offline_pages_json", arr.toString()).apply()
     }
     
     private fun showDownloads() {
@@ -478,6 +919,36 @@ class BrowserActivity : AppCompatActivity() {
                 }
                 currentTab?.webView?.reload()
             }
+            dialog.dismiss()
+        }
+
+        menuView.findViewById<View>(R.id.menu_reader_mode).setOnClickListener {
+            toggleReaderMode()
+            dialog.dismiss()
+        }
+
+        menuView.findViewById<View>(R.id.menu_bookmarks).setOnClickListener {
+            showBookmarksDialog()
+            dialog.dismiss()
+        }
+
+        menuView.findViewById<View>(R.id.menu_tab_groups).setOnClickListener {
+            showTabGroupsDialog()
+            dialog.dismiss()
+        }
+
+        menuView.findViewById<View>(R.id.menu_save_offline).setOnClickListener {
+            saveCurrentPageOffline()
+            dialog.dismiss()
+        }
+
+        menuView.findViewById<View>(R.id.menu_send_notes).setOnClickListener {
+            sendCurrentPageToNotes()
+            dialog.dismiss()
+        }
+
+        menuView.findViewById<View>(R.id.menu_create_task).setOnClickListener {
+            createTaskFromCurrentPage()
             dialog.dismiss()
         }
         

@@ -47,7 +47,8 @@ class TabsAdapter(
         
         fun bind(tab: Tab) {
             title.text = tab.title.ifEmpty { "New Tab" }
-            url.text = tab.url.ifEmpty { "" }
+            val safeUrl = tab.url.ifEmpty { "" }
+            url.text = "${tab.groupName} • $safeUrl".trim().trimEnd('•').trim()
             
             // Load favicon
             tab.webView.favicon?.let { icon ->
