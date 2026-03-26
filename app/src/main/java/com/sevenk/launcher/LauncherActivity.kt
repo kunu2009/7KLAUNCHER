@@ -1,6 +1,7 @@
 package com.sevenk.launcher
 
 import android.app.WallpaperManager
+import android.content.SharedPreferences
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.LauncherApps
@@ -8,6 +9,7 @@ import android.content.pm.ShortcutInfo
 import android.appwidget.AppWidgetHost
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
+import android.content.Context
 import android.os.Bundle as AndroidBundle
 import android.os.Build
 import android.os.Bundle
@@ -28,6 +30,12 @@ import android.widget.EditText
 import android.text.Editable
 import android.text.TextWatcher
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.content.res.AppCompatResources
+import com.sevenk.launcher.optimization.AdvancedBatteryOptimizer
+import com.sevenk.launcher.optimization.AdvancedRAMOptimizer
+import com.sevenk.launcher.optimization.AdvancedCPUOptimizer
+import com.sevenk.launcher.optimization.LauncherSpecificOptimizer
+import com.sevenk.launcher.optimization.PerformanceMonitor
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.FileProvider
 import androidx.core.view.GestureDetectorCompat
@@ -38,18 +46,25 @@ import androidx.viewpager2.widget.ViewPager2
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.roundToInt
+import android.util.Log
+import com.sevenk.launcher.iconpack.IconPackHelper
 import android.widget.Toast
+import kotlin.math.roundToInt
 import java.io.File
 import com.yalantis.ucrop.UCrop
 import android.view.DragEvent
 import android.content.ClipDescription
 import android.view.animation.DecelerateInterpolator
 import com.sevenk.launcher.util.Perf
-import com.sevenk.launcher.iconpack.IconPackHelper
-import com.sevenk.launcher.battery.BatteryOptimizer
+import com.sevenk.launcher.ui.glass.GlassEffectHelper
+import com.sevenk.launcher.gestures.EnhancedGestureManager
+import com.sevenk.launcher.backup.EnhancedBackupManager
+import com.sevenk.launcher.widgets.EnhancedWidgetManager
+import com.sevenk.launcher.optimization.BatteryOptimizer
+import com.sevenk.launcher.optimization.RAMOptimizer
 import android.os.Process
 import com.sevenk.launcher.gesture.GestureManager
+import com.sevenk.launcher.drawer.AppDrawerFragment
 
 class LauncherActivity : AppCompatActivity() {
     private lateinit var appDrawerContainer: ViewGroup
@@ -75,12 +90,507 @@ class LauncherActivity : AppCompatActivity() {
     private lateinit var appWidgetManager: AppWidgetManager
     private val prefs by lazy { getSharedPreferences("sevenk_launcher_prefs", MODE_PRIVATE) }
     
+    // Enhanced managers
+    private lateinit var glassEffectHelper: GlassEffectHelper
+    private lateinit var enhancedGestureManager: EnhancedGestureManager
+    private lateinit var enhancedBackupManager: EnhancedBackupManager
+    private lateinit var enhancedWidgetManager: EnhancedWidgetManager
+    
+    // Performance optimizers
+    private lateinit var batteryOptimizer: BatteryOptimizer
+    private lateinit var ramOptimizer: RAMOptimizer
+
+    private fun loadAppsAsync() {
+        android.util.Log.d("LauncherActivity", "Starting loadAppsAsync")
+        
+        lifecycleScope.launch {
+            try {
+                // Load apps in background thread
+                val loadedApps = withContext(Dispatchers.IO) {
+                    loadInstalledApps()
+                }
+                
+                // Update UI on main thread
+                withContext(Dispatchers.Main) {
+                    android.util.Log.d("LauncherActivity", "Loaded ${loadedApps.size} apps")
+                    appList.clear()
+                    appList.addAll(loadedApps)
+                    
+                    // Update app drawer with loaded apps
+                    refreshDrawerPages(appList)
+                    
+                    // Update dock and sidebar
+                    rebuildDock()
+                    rebuildSidebar()
+                    
+                    // Update home pages
+                    refreshHomePages()
+                    
+                    android.util.Log.d("LauncherActivity", "App loading completed successfully")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("LauncherActivity", "Failed to load apps", e)
+                // Show user-friendly error
+                runOnUiThread {
+                    Toast.makeText(this@LauncherActivity, "Failed to load apps", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun loadInstalledApps(): List<AppInfo> {
+        val apps = mutableListOf<AppInfo>()
+        
+        try {
+            val packageManager = packageManager
+            
+            // Load regular apps with launcher intent
+            val launcherIntent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_LAUNCHER)
+            }
+            
+            val activities = packageManager.queryIntentActivities(launcherIntent, 0)
+            android.util.Log.d("LauncherActivity", "Found ${activities.size} launcher activities")
+            
+            // Add regular apps
+            for (resolveInfo in activities) {
+                try {
+                    val activityInfo = resolveInfo.activityInfo
+                    val packageName = activityInfo.packageName
+                    val className = activityInfo.name
+                    
+                    // Skip if this is our own launcher
+                    if (packageName == this.packageName) continue
+                    
+                    val applicationInfo = packageManager.getApplicationInfo(packageName, 0)
+                    val name = packageManager.getApplicationLabel(applicationInfo).toString()
+                    val icon = packageManager.getApplicationIcon(applicationInfo)
+                    
+                    val appInfo = AppInfo(
+                        name = name,
+                        packageName = packageName,
+                        className = className,
+                        icon = icon,
+                        applicationInfo = applicationInfo,
+                        usageStats = null // Usage stats can be loaded separately if needed
+                    )
+                    
+                    apps.add(appInfo)
+                    
+                } catch (e: Exception) {
+                    android.util.Log.w("LauncherActivity", "Failed to load app info for ${resolveInfo.activityInfo?.packageName}", e)
+                }
+            }
+            
+            // Add PWAs (Progressive Web Apps)
+            try {
+                val pwaIntent = Intent(Intent.ACTION_VIEW).apply {
+                    addCategory(Intent.CATEGORY_BROWSABLE)
+                    data = android.net.Uri.parse("https://")
+                }
+                
+                val pwaActivities = packageManager.queryIntentActivities(pwaIntent, 0)
+                android.util.Log.d("LauncherActivity", "Found ${pwaActivities.size} PWA activities")
+                
+                for (resolveInfo in pwaActivities) {
+                    try {
+                        val activityInfo = resolveInfo.activityInfo
+                        val packageName = activityInfo.packageName
+                        val className = activityInfo.name
+                        
+                        // Skip if already added or if it's our own launcher
+                        if (packageName == this.packageName || 
+                            apps.any { it.packageName == packageName && it.className == className }) {
+                            continue
+                        }
+                        
+                        val applicationInfo = packageManager.getApplicationInfo(packageName, 0)
+                        val name = resolveInfo.loadLabel(packageManager).toString()
+                        val icon = activityInfo.loadIcon(packageManager)
+                        
+                        val appInfo = AppInfo(
+                            name = name,
+                            packageName = packageName,
+                            className = className,
+                            icon = icon,
+                            applicationInfo = applicationInfo,
+                            isPWA = true
+                        )
+                        
+                        apps.add(appInfo)
+                        
+                    } catch (e: Exception) {
+                        android.util.Log.w("LauncherActivity", "Failed to load PWA info for ${resolveInfo.activityInfo?.packageName}", e)
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("LauncherActivity", "Error loading PWAs", e)
+            }
+            
+            // Add internal synthetic apps
+            addInternalApps(apps)
+            
+            // Sort apps alphabetically by name
+            apps.sortBy { it.name.lowercase() }
+            
+        } catch (e: Exception) {
+            android.util.Log.e("LauncherActivity", "Failed to query launcher activities", e)
+        }
+        
+        return apps
+    }
+
+    private fun addInternalApps(apps: MutableList<AppInfo>) {
+        try {
+            // Add internal calculator app
+            val calcIcon = try {
+                AppCompatResources.getDrawable(this, R.drawable.ic_app_default)
+            } catch (e: Exception) {
+                android.graphics.drawable.ColorDrawable(android.graphics.Color.BLUE)
+            }
+            apps.add(AppInfo(
+                name = "7K Calculator",
+                packageName = INTERNAL_CALC_PKG,
+                className = "com.sevenk.calcvault.VaultActivity",
+                icon = calcIcon
+            ))
+            
+            // Add 7K Settings app
+            val settingsIcon = try {
+                AppCompatResources.getDrawable(this, R.drawable.ic_settings)
+            } catch (e: Exception) {
+                android.graphics.drawable.ColorDrawable(android.graphics.Color.GRAY)
+            }
+            apps.add(AppInfo(
+                name = "7K Settings",
+                packageName = "internal.7ksettings",
+                className = "com.sevenk.launcher.SettingsActivity",
+                icon = settingsIcon
+            ))
+            
+            // Add 7K Enhanced Settings app
+            val enhancedSettingsIcon = try {
+                AppCompatResources.getDrawable(this, R.drawable.ic_settings)
+            } catch (e: Exception) {
+                android.graphics.drawable.ColorDrawable(android.graphics.Color.BLUE)
+            }
+            apps.add(AppInfo(
+                name = "7K Enhanced Settings",
+                packageName = "internal.7kenhancedsettings",
+                className = "com.sevenk.launcher.settings.EnhancedSettingsActivity",
+                icon = enhancedSettingsIcon
+            ))
+            
+            // Add other internal apps if resources exist
+            try {
+                val studioIcon = try {
+                    AppCompatResources.getDrawable(this, R.drawable.sevenk_studio_icon)
+                } catch (e: Exception) {
+                    try {
+                        AppCompatResources.getDrawable(this, R.drawable.ic_app_default)
+                    } catch (e2: Exception) {
+                        android.graphics.drawable.ColorDrawable(android.graphics.Color.GREEN)
+                    }
+                }
+                apps.add(AppInfo(
+                    name = "7K Studio",
+                    packageName = INTERNAL_STUDIO_PKG,
+                    className = "com.sevenk.studio.StudioActivity",
+                    icon = studioIcon
+                ))
+            } catch (e: Exception) {
+                android.util.Log.w("LauncherActivity", "Studio icon not found", e)
+            }
+
+            try {
+                val notesIcon = try {
+                    AppCompatResources.getDrawable(this, R.drawable.ic_app_default)
+                } catch (e: Exception) {
+                    android.graphics.drawable.ColorDrawable(android.graphics.Color.YELLOW)
+                }
+                apps.add(AppInfo(
+                    name = "7K Notes",
+                    packageName = INTERNAL_NOTES_PKG,
+                    className = "com.sevenk.launcher.notes.NotesActivity",
+                    icon = notesIcon
+                ))
+            } catch (e: Exception) {
+                android.util.Log.w("LauncherActivity", "Notes icon not found", e)
+            }
+
+            try {
+                val browserIcon = try {
+                    AppCompatResources.getDrawable(this, R.drawable.ic_web)
+                } catch (e: Exception) {
+                    android.graphics.drawable.ColorDrawable(android.graphics.Color.BLUE)
+                }
+                apps.add(AppInfo(
+                    name = "7K Browser",
+                    packageName = "internal.7kbrowser",
+                    className = "com.sevenk.browser.BrowserActivity",
+                    icon = browserIcon
+                ))
+            } catch (e: Exception) {
+                android.util.Log.w("LauncherActivity", "Browser icon not found", e)
+            }
+
+            // Add 7K Study app
+            try {
+                val studyIcon = try {
+                    AppCompatResources.getDrawable(this, R.drawable.ic_study_default)
+                } catch (e: Exception) {
+                    android.graphics.drawable.ColorDrawable(android.graphics.Color.MAGENTA)
+                }
+                apps.add(AppInfo(
+                    name = "7K Study",
+                    packageName = INTERNAL_STUDY_PKG,
+                    className = "com.sevenk.launcher.StudyActivity",
+                    icon = studyIcon
+                ))
+            } catch (e: Exception) {
+                android.util.Log.w("LauncherActivity", "Study icon not found", e)
+            }
+
+            // Add additional embedded 7K apps (web app wrappers)
+            val webIcon = try {
+                AppCompatResources.getDrawable(this, R.drawable.ic_web)
+            } catch (_: Exception) {
+                android.graphics.drawable.ColorDrawable(android.graphics.Color.CYAN)
+            }
+
+            apps.add(AppInfo(
+                name = "7K Law Prep",
+                packageName = INTERNAL_LAW_PKG,
+                className = "com.sevenk.launcher.WebAppActivity",
+                icon = webIcon
+            ))
+            apps.add(AppInfo(
+                name = "7K Itihaas",
+                packageName = INTERNAL_ITIHAAS_PKG,
+                className = "com.sevenk.launcher.WebAppActivity",
+                icon = webIcon
+            ))
+            apps.add(AppInfo(
+                name = "7K Polyglot",
+                packageName = INTERNAL_POLYGLOT_PKG,
+                className = "com.sevenk.launcher.WebAppActivity",
+                icon = webIcon
+            ))
+            apps.add(AppInfo(
+                name = "7K Eco",
+                packageName = INTERNAL_ECO_PKG,
+                className = "com.sevenk.launcher.WebAppActivity",
+                icon = webIcon
+            ))
+            apps.add(AppInfo(
+                name = "7K Life",
+                packageName = INTERNAL_LIFE_PKG,
+                className = "com.sevenk.launcher.WebAppActivity",
+                icon = webIcon
+            ))
+            apps.add(AppInfo(
+                name = "7K Calendar",
+                packageName = INTERNAL_CALENDAR2_PKG,
+                className = "com.sevenk.launcher.WebAppActivity",
+                icon = webIcon
+            ))
+            apps.add(AppInfo(
+                name = "7K Weather",
+                packageName = INTERNAL_WEATHER_PKG,
+                className = "com.sevenk.launcher.WebAppActivity",
+                icon = webIcon
+            ))
+            apps.add(AppInfo(
+                name = "7K Music",
+                packageName = INTERNAL_MUSIC_PKG,
+                className = "com.sevenk.launcher.WebAppActivity",
+                icon = webIcon
+            ))
+            apps.add(AppInfo(
+                name = "7K Utility",
+                packageName = INTERNAL_UTILITY_PKG,
+                className = "com.sevenk.launcher.ecosystem.UtilityActivity",
+                icon = webIcon
+            ))
+            apps.add(AppInfo(
+                name = "7K Games",
+                packageName = INTERNAL_GAMES_PKG,
+                className = "com.sevenk.launcher.ecosystem.GamesActivity",
+                icon = webIcon
+            ))
+            apps.add(AppInfo(
+                name = "7K Widgets",
+                packageName = INTERNAL_WIDGETS_PKG,
+                className = "com.sevenk.launcher.ecosystem.WidgetsHubActivity",
+                icon = webIcon
+            ))
+            apps.add(AppInfo(
+                name = "7K AppStore",
+                packageName = INTERNAL_APPSTORE_PKG,
+                className = "com.sevenk.launcher.ecosystem.AppStoreActivity",
+                icon = webIcon
+            ))
+            apps.add(AppInfo(
+                name = "7K Smart Notes+",
+                packageName = INTERNAL_SMART_NOTES_PLUS_PKG,
+                className = "com.sevenk.launcher.notes.ui.NotesActivity",
+                icon = webIcon
+            ))
+            apps.add(AppInfo(
+                name = "7K Tasks Commander",
+                packageName = INTERNAL_TASKS_COMMANDER_PKG,
+                className = "com.sevenk.launcher.ecosystem.TasksCommanderActivity",
+                icon = webIcon
+            ))
+            apps.add(AppInfo(
+                name = "7K File Forge",
+                packageName = INTERNAL_FILE_FORGE_PKG,
+                className = "com.sevenk.launcher.ecosystem.FileForgeActivity",
+                icon = webIcon
+            ))
+            apps.add(AppInfo(
+                name = "7K Budget Guardian",
+                packageName = INTERNAL_BUDGET_GUARDIAN_PKG,
+                className = "com.sevenk.launcher.ecosystem.BudgetGuardianActivity",
+                icon = webIcon
+            ))
+            apps.add(AppInfo(
+                name = "7K Privacy Shield",
+                packageName = INTERNAL_PRIVACY_SHIELD_PKG,
+                className = "com.sevenk.launcher.ecosystem.PrivacyShieldActivity",
+                icon = webIcon
+            ))
+            apps.add(AppInfo(
+                name = "7K Battery Doctor",
+                packageName = INTERNAL_BATTERY_DOCTOR_PKG,
+                className = "com.sevenk.launcher.ecosystem.BatteryDoctorActivity",
+                icon = webIcon
+            ))
+            apps.add(AppInfo(
+                name = "7K Studio Templates",
+                packageName = INTERNAL_STUDIO_TEMPLATES_PKG,
+                className = "com.sevenk.launcher.ecosystem.StudioTemplatesActivity",
+                icon = webIcon
+            ))
+            apps.add(AppInfo(
+                name = "7K Offline First AppStore",
+                packageName = INTERNAL_OFFLINE_APPSTORE_PKG,
+                className = "com.sevenk.launcher.ecosystem.OfflineFirstAppStoreActivity",
+                icon = webIcon
+            ))
+            
+            android.util.Log.d("LauncherActivity", "Added internal apps")
+        } catch (e: Exception) {
+            android.util.Log.e("LauncherActivity", "Failed to add internal apps", e)
+        }
+    }
+
+    private fun handleGestureAction(action: String, targetPackage: String?): Boolean {
+        return when (action) {
+            "OPEN_APP_DRAWER" -> {
+                toggleAppDrawer(true)
+                true
+            }
+            "CLOSE_APP_DRAWER" -> {
+                toggleAppDrawer(false)
+                true
+            }
+            "OPEN_SETTINGS" -> {
+                try {
+                    val intent = Intent(android.provider.Settings.ACTION_SETTINGS)
+                    startActivity(intent)
+                    true
+                } catch (e: Exception) {
+                    false
+                }
+            }
+            "OPEN_LAUNCHER_SETTINGS" -> {
+                try {
+                    startActivity(Intent(this, SettingsActivity::class.java))
+                    true
+                } catch (e: Exception) {
+                    false
+                }
+            }
+            "OPEN_SEARCH" -> {
+                try {
+                    startActivity(Intent(this, com.sevenk.launcher.search.GlobalSearchActivity::class.java))
+                    true
+                } catch (e: Exception) {
+                    false
+                }
+            }
+            "TOGGLE_SIDEBAR" -> {
+                try {
+                    if (::sidebar.isInitialized) {
+                        val isVisible = sidebar.visibility == View.VISIBLE
+                        sidebar.visibility = if (isVisible) View.GONE else View.VISIBLE
+                        if (::sidebarScrim.isInitialized) {
+                            sidebarScrim.visibility = if (isVisible) View.GONE else View.VISIBLE
+                        }
+                    }
+                    true
+                } catch (e: Exception) {
+                    false
+                }
+            }
+            "LAUNCH_APP" -> {
+                if (targetPackage != null) {
+                    try {
+                        val intent = packageManager.getLaunchIntentForPackage(targetPackage)
+                        if (intent != null) {
+                            startActivity(intent)
+                            return true
+                        }
+                    } catch (e: Exception) {
+                        // Ignore
+                    }
+                }
+                false
+            }
+            "OPEN_CALCULATOR" -> {
+                try {
+                    startActivity(Intent(this, com.sevenk.calcvault.MainActivity::class.java))
+                    true
+                } catch (e: Exception) {
+                    false
+                }
+            }
+            "OPEN_VAULT" -> {
+                try {
+                    startActivity(Intent(this, com.sevenk.calcvault.VaultActivity::class.java))
+                    true
+                } catch (e: Exception) {
+                    false
+                }
+            }
+            "REFRESH_WIDGETS" -> {
+                try {
+                    restoreWidgetIfAny()
+                    true
+                } catch (e: Exception) {
+                    false
+                }
+            }
+            else -> {
+                // Try to delegate to gesture manager for system actions
+                try {
+                    val gestureAction = GestureManager.GestureAction.valueOf(action)
+                    gestureManager.performAction(gestureAction, targetPackage)
+                } catch (e: Exception) {
+                    false
+                }
+            }
+        }
+    }
+
+    
     // Preference change listener for app drawer updates
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         when (key) {
             "drawer_sort_order", "drawer_alphabet_headers" -> {
                 // Refresh app drawer to apply new settings
-                refreshAppDrawer()
+                refreshDrawerPages(appList)
             }
         }
     }
@@ -91,6 +601,10 @@ class LauncherActivity : AppCompatActivity() {
 
     // Add a getter method to expose the app list to fragments/adapters
     fun getAppList(): List<AppInfo> = appList
+    
+    // Search functionality
+    private var searchQuery: String = ""
+    
 
     // Package change receiver to refresh UI immediately after install/uninstall
     private val packageChangeReceiver = object : android.content.BroadcastReceiver() {
@@ -140,32 +654,81 @@ class LauncherActivity : AppCompatActivity() {
     private fun ensureSearchBoxReady() {
         try {
             if (!::searchBox.isInitialized) {
-                // Try to find again (could be present in some layouts)
                 val found: EditText? = try { findViewById(R.id.searchBox) } catch (_: Throwable) { null }
                 if (found != null) {
                     searchBox = found
+                    setupSearchBox()
                     return
                 }
-                android.util.Log.w("LauncherActivity", "searchBox not found in layout; creating placeholder")
                 searchBox = EditText(this).apply {
                     id = R.id.searchBox
-                    visibility = View.GONE
-                    isFocusable = false
-                    isFocusableInTouchMode = false
+                    visibility = View.VISIBLE
+                    isFocusable = true
+                    isFocusableInTouchMode = true
+                    hint = "Search apps..."
                 }
-                // Ensure placeholder is attached to the view hierarchy so it has a window token if needed
-                try {
-                    val root = findViewById<ViewGroup>(android.R.id.content)
-                    if (searchBox.parent == null) root.addView(searchBox, ViewGroup.LayoutParams(1, 1))
-                } catch (_: Throwable) { /* non-fatal */ }
+                val root = findViewById<ViewGroup>(android.R.id.content)
+                if (searchBox.parent == null) root.addView(searchBox, ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ))
+                setupSearchBox()
             }
-        } catch (_: Throwable) { /* never crash from here */ }
+        } catch (e: Throwable) { 
+            android.util.Log.e("LauncherActivity", "Error initializing search box", e)
+        }
     }
+    
+    private fun setupSearchBox() {
+        try {
+            // Disable the LauncherActivity search as AppDrawerFragment handles its own search
+            /* DISABLED - AppDrawerFragment now handles search internally
+            searchBox.addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                    filterApps(s?.toString() ?: "")
+                }
+                
+                override fun afterTextChanged(s: Editable?) {}
+            })
+            */
+            
+            // Handle search box focus changes
+            searchBox.setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) {
+                    // Show keyboard when search box is focused
+                    val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+                    imm.showSoftInput(searchBox, InputMethodManager.SHOW_IMPLICIT)
+                }
+            }
+            
+            android.util.Log.d("LauncherActivity", "Search box initialized")
+        } catch (e: Exception) {
+            android.util.Log.e("LauncherActivity", "Error setting up search box", e)
+        }
+    }
+    
+    private fun filterApps(query: String) {
+        searchQuery = query.trim()
+        if (searchQuery.isEmpty()) {
+            // If search query is empty, show all apps
+            refreshDrawerPages(appList)
+            return
+        }
+        
+        val filteredList = appList.filter { 
+            it.name.contains(searchQuery, ignoreCase = true) || 
+            it.packageName.contains(searchQuery, ignoreCase = true)
+        }
+        
+        refreshDrawerPages(filteredList)
+    }
+
     private var sidebarOverlayEnabled = false
     private var sidebarOverlayOpen = false
     private lateinit var iconPackHelper: IconPackHelper
     private val REQ_PICK_BACKGROUND = 5012
-    private lateinit var batteryOptimizer: BatteryOptimizer
     private var prewarmJob: kotlinx.coroutines.Job? = null
 
     private fun applyGlassBlurIfPossible(view: View?, radius: Float) {
@@ -194,9 +757,10 @@ class LauncherActivity : AppCompatActivity() {
             if (Build.VERSION.SDK_INT < 31) return false
             val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
             if (am.isLowRamDevice) return false
-            // Disable expensive blur in device power-save or our own low-power mode
+            // Disable expensive blur in device power-save mode
             if (this::batteryOptimizer.isInitialized) {
-                if (batteryOptimizer.isDeviceInPowerSaveMode() || batteryOptimizer.isBatterySavingMode()) return false
+                val profile = AdvancedBatteryOptimizer(this).getCurrentPowerProfile()
+                if (profile != AdvancedBatteryOptimizer.PowerProfile.MAXIMUM_PERFORMANCE) return false
             }
             prefs.getBoolean("enable_runtime_blur", true)
         } catch (_: Throwable) {
@@ -211,10 +775,44 @@ class LauncherActivity : AppCompatActivity() {
 
     // ---- In-app wallpaper background (SAF) ----
     private fun customBackgroundKey() = "custom_bg_uri"
+    private fun preloadedWallpaperAssetKey() = "preloaded_wallpaper_asset"
+    private fun defaultWallpaperInitKey() = "default_wallpaper_initialized"
+
+    private fun ensureDefaultWallpaperSelection() {
+        if (prefs.getBoolean(defaultWallpaperInitKey(), false)) return
+        val existingAsset = prefs.getString(preloadedWallpaperAssetKey(), null)
+        prefs.edit()
+            .apply {
+                if (existingAsset.isNullOrBlank()) putString(preloadedWallpaperAssetKey(), "7.jpeg")
+                putBoolean(defaultWallpaperInitKey(), true)
+            }
+            .apply()
+    }
+
+    private fun applyPreloadedWallpaperIfAny(): Boolean {
+        val assetName = prefs.getString(preloadedWallpaperAssetKey(), null)?.trim().orEmpty()
+        if (assetName.isBlank()) return false
+        return try {
+            val bitmap = assets.open(assetName).use { input ->
+                android.graphics.BitmapFactory.decodeStream(input)
+            }
+            if (bitmap != null) {
+                homeScreen.background = android.graphics.drawable.BitmapDrawable(resources, bitmap)
+                true
+            } else {
+                false
+            }
+        } catch (_: Throwable) {
+            false
+        }
+    }
 
     private fun applyCustomBackgroundIfAny() {
         val uriStr = prefs.getString(customBackgroundKey(), null)
         if (uriStr.isNullOrBlank()) {
+            // New-user default + optional preloaded wallpaper fallback before system wallpaper.
+            ensureDefaultWallpaperSelection()
+            if (applyPreloadedWallpaperIfAny()) return
             // Fallback to system wallpaper/transparent
             setWallpaper()
             return
@@ -327,6 +925,47 @@ private fun showSidebarItemOptions(app: AppInfo) {
         .show()
 }
 
+private fun showDockContextMenu(show: Boolean = true) {
+    if (!show) return
+    
+    // Show dock configuration options
+    val options = arrayOf(
+        "Edit Dock",
+        "Add Widget",
+        "Dock Settings",
+        "Glass Effects"
+    )
+    
+    AlertDialog.Builder(this)
+        .setTitle("Dock Options")
+        .setItems(options) { _, which ->
+            when (which) {
+                0 -> startEditDockMode()
+                1 -> showAddWidgetDialog()
+                2 -> showDockSettings()
+                3 -> toggleGlassEffects()
+            }
+        }
+        .setNegativeButton("Cancel", null)
+        .show()
+}
+
+private fun showAddWidgetDialog() {
+    // TODO: Implement widget addition
+    Toast.makeText(this, "Add widget", Toast.LENGTH_SHORT).show()
+}
+
+private fun showDockSettings() {
+    // TODO: Open dock-specific settings
+    Toast.makeText(this, "Dock settings", Toast.LENGTH_SHORT).show()
+}
+
+private fun toggleGlassEffects() {
+    val currentEnabled = prefs.getBoolean("glass_effects_enabled", true)
+    prefs.edit().putBoolean("glass_effects_enabled", !currentEnabled).apply()
+    Toast.makeText(this, "Glass effects ${if (!currentEnabled) "enabled" else "disabled"}", Toast.LENGTH_SHORT).show()
+}
+
 // Expose recent packages for assistants
 fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
     private val KEY_DOCK = "dock_packages"
@@ -349,6 +988,7 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
     private val INTERNAL_CALC_PKG = "internal.calcvault"
     private val INTERNAL_STUDIO_PKG = "internal.7kstudio"
     private val INTERNAL_LAW_PKG = "internal.7klawprep"
+    private val INTERNAL_STUDY_PKG = "internal.7kstudy"
     // New synthetic PWAs
     private val INTERNAL_ITIHAAS_PKG = "internal.7kitihaas"
     private val INTERNAL_POLYGLOT_PKG = "internal.7kpolyglot"
@@ -359,6 +999,18 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
     private val INTERNAL_CALENDAR2_PKG = "internal.7kcalendar"
     private val INTERNAL_WEATHER_PKG = "internal.7kweather"
     private val INTERNAL_MUSIC_PKG = "internal.7kmusic"
+    private val INTERNAL_UTILITY_PKG = "internal.7kutility"
+    private val INTERNAL_GAMES_PKG = "internal.7kgames"
+    private val INTERNAL_WIDGETS_PKG = "internal.7kwidgets"
+    private val INTERNAL_APPSTORE_PKG = "internal.7kappstore"
+    private val INTERNAL_SMART_NOTES_PLUS_PKG = "internal.7ksmartnotesplus"
+    private val INTERNAL_TASKS_COMMANDER_PKG = "internal.7ktaskscommander"
+    private val INTERNAL_FILE_FORGE_PKG = "internal.7kfileforge"
+    private val INTERNAL_BUDGET_GUARDIAN_PKG = "internal.7kbudgetguardian"
+    private val INTERNAL_PRIVACY_SHIELD_PKG = "internal.7kprivacyshield"
+    private val INTERNAL_BATTERY_DOCTOR_PKG = "internal.7kbatterydoctor"
+    private val INTERNAL_STUDIO_TEMPLATES_PKG = "internal.7kstudiotemplates"
+    private val INTERNAL_OFFLINE_APPSTORE_PKG = "internal.7kofflineappstore"
 
     // Folders per page (persisted) - using existing Folder class
     private val homeFolders: MutableMap<Int, MutableList<Folder>> = mutableMapOf()
@@ -448,10 +1100,27 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                                 app.packageName != INTERNAL_CALC_PKG &&
                                 app.packageName != INTERNAL_STUDIO_PKG &&
                                 app.packageName != INTERNAL_LAW_PKG &&
+                                app.packageName != INTERNAL_STUDY_PKG &&
                                 app.packageName != INTERNAL_ITIHAAS_PKG &&
                                 app.packageName != INTERNAL_POLYGLOT_PKG &&
                                 app.packageName != INTERNAL_ECO_PKG &&
-                                app.packageName != INTERNAL_LIFE_PKG) {
+                                app.packageName != INTERNAL_LIFE_PKG &&
+                                app.packageName != INTERNAL_NOTES_PKG &&
+                                app.packageName != INTERNAL_CALENDAR2_PKG &&
+                                app.packageName != INTERNAL_WEATHER_PKG &&
+                                app.packageName != INTERNAL_MUSIC_PKG &&
+                                app.packageName != INTERNAL_UTILITY_PKG &&
+                                app.packageName != INTERNAL_GAMES_PKG &&
+                                app.packageName != INTERNAL_WIDGETS_PKG &&
+                                app.packageName != INTERNAL_APPSTORE_PKG &&
+                                app.packageName != INTERNAL_SMART_NOTES_PLUS_PKG &&
+                                app.packageName != INTERNAL_TASKS_COMMANDER_PKG &&
+                                app.packageName != INTERNAL_FILE_FORGE_PKG &&
+                                app.packageName != INTERNAL_BUDGET_GUARDIAN_PKG &&
+                                app.packageName != INTERNAL_PRIVACY_SHIELD_PKG &&
+                                app.packageName != INTERNAL_BATTERY_DOCTOR_PKG &&
+                                app.packageName != INTERNAL_STUDIO_TEMPLATES_PKG &&
+                                app.packageName != INTERNAL_OFFLINE_APPSTORE_PKG) {
                                 val uri = Uri.parse("package:${app.packageName}")
                                 // Prefer ACTION_DELETE (widely supported), fallback to ACTION_UNINSTALL_PACKAGE
                                 val delete = Intent(Intent.ACTION_DELETE, uri).apply {
@@ -622,8 +1291,8 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
     }
 
     private fun getDrawerSections(): List<String> {
-        // First page is ALL, then user-defined sections in saved order
-        return listOf("ALL") + sectionOrder
+        // Fixed first pages: All Apps first, then 7K Apps, then user-defined sections.
+        return listOf("All Apps", "7K Apps") + sectionOrder
     }
 
     private fun getCurrentDrawerFragment(): AppDrawerPageFragment? {
@@ -639,12 +1308,23 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
     }
 
     private fun refreshDrawerPages(sourceList: List<AppInfo>) {
-        // Ensure adapter sections are current
-        val sections = getDrawerSections()
-        drawerPagerAdapter.setSections(sections)
-        // Update any attached fragments with their filtered data
-        sections.forEachIndexed { index, sec ->
-            drawerPagerAdapter.getFragment(index)?.updateAppsForPage(sourceList, sec, sectionMap)
+        try {
+            // Ensure adapter sections are current
+            val sections = getDrawerSections()
+            if (::drawerPagerAdapter.isInitialized) {
+                drawerPagerAdapter.setSections(sections)
+            }
+
+            // Update the app list in the current fragment
+            val currentFragment = getCurrentDrawerFragment()
+            val currentPageIndex = appDrawerPager.currentItem
+            val sectionName = sections.getOrNull(currentPageIndex)
+
+            if (currentFragment != null && sectionName != null) {
+                currentFragment.updateAppsForPage(sourceList, sectionName, sectionMap)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("LauncherActivity", "Error refreshing drawer pages", e)
         }
     }
 
@@ -751,6 +1431,16 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                 }
             }
 
+            // Initialize performance optimizers early
+            try {
+                batteryOptimizer = BatteryOptimizer(this)
+                ramOptimizer = RAMOptimizer(this)
+                ramOptimizer.startPeriodicCleanup()
+                android.util.Log.d("LauncherActivity", "Performance optimizers initialized")
+            } catch (e: Exception) {
+                android.util.Log.e("LauncherActivity", "Failed to initialize optimizers", e)
+            }
+
             // Initialize views with extensive logging and null checks
             android.util.Log.d("LauncherActivity", "Starting view initialization")
             
@@ -828,22 +1518,93 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                 android.util.Log.e("LauncherActivity", "IconPackHelper initialization failed", e)
             }
             
+            // Initialize enhanced managers
+            try {
+                glassEffectHelper = GlassEffectHelper(this)
+                android.util.Log.d("LauncherActivity", "GlassEffectHelper initialized")
+            } catch (e: Exception) {
+                android.util.Log.e("LauncherActivity", "GlassEffectHelper initialization failed", e)
+            }
+            
+            try {
+                enhancedBackupManager = EnhancedBackupManager(this)
+                android.util.Log.d("LauncherActivity", "EnhancedBackupManager initialized")
+            } catch (e: Exception) {
+                android.util.Log.e("LauncherActivity", "EnhancedBackupManager initialization failed", e)
+            }
+            
+            try {
+                enhancedWidgetManager = EnhancedWidgetManager(this, appWidgetHost, appWidgetManager)
+                android.util.Log.d("LauncherActivity", "EnhancedWidgetManager initialized")
+            } catch (e: Exception) {
+                android.util.Log.e("LauncherActivity", "EnhancedWidgetManager initialization failed", e)
+            }
+            
+            // Initialize enhanced gesture manager
+            try {
+                enhancedGestureManager = EnhancedGestureManager(
+                    context = this,
+                    onShowAppDrawer = { toggleAppDrawer(true) },
+                    onShowDockMenu = { showDockContextMenu(true) },
+                    onPageSwipe = { direction -> 
+                        val currentItem = homePager.currentItem
+                        when (direction) {
+                            EnhancedGestureManager.SWIPE_LEFT -> {
+                                if (currentItem < (homePager.adapter?.itemCount ?: 0) - 1) {
+                                    homePager.setCurrentItem(currentItem + 1, true)
+                                }
+                            }
+                            EnhancedGestureManager.SWIPE_RIGHT -> {
+                                if (currentItem > 0) {
+                                    homePager.setCurrentItem(currentItem - 1, true)
+                                }
+                            }
+                        }
+                    },
+                    onShowQuickSettings = { /* TODO: Implement quick settings */ },
+                    onTriggerScreenLock = { 
+                        try {
+                            val devicePolicyManager = getSystemService(Context.DEVICE_POLICY_SERVICE)
+                            // Try to lock screen if possible
+                        } catch (e: Exception) {
+                            // Screen lock not available
+                        }
+                    }
+                )
+                
+                // Replace the old gesture detector with the enhanced one
+                gestureDetector = enhancedGestureManager.createEnhancedGestureDetector()
+                android.util.Log.d("LauncherActivity", "EnhancedGestureManager initialized")
+            } catch (e: Exception) {
+                android.util.Log.e("LauncherActivity", "EnhancedGestureManager initialization failed", e)
+            }
+            
             // Apply any saved custom launcher background (fallback to system wallpaper)
             try { applyCustomBackgroundIfAny() } catch (_: Throwable) {}
             // Apply glass blur on Android 12+ (optional, skip if fails)
-            applyGlassBlurIfPossible(homeScreen, 18f)
-            if (Build.VERSION.SDK_INT >= 31) {
-                try {
+            try {
+                if (::glassEffectHelper.isInitialized) {
+                    glassEffectHelper.applyGlassEffect(homeScreen, GlassEffectHelper.GlassIntensity.LIGHT)
+                    glassEffectHelper.applyGlassEffect(dock, GlassEffectHelper.GlassIntensity.NORMAL)
+                    glassEffectHelper.applyGlassEffect(sidebar, GlassEffectHelper.GlassIntensity.NORMAL)
+                    val searchLocal: View? = findViewById(R.id.searchBox)
+                    if (searchLocal != null) glassEffectHelper.applyGlassEffect(searchLocal, GlassEffectHelper.GlassIntensity.LIGHT)
+                    val selectionLocal: View? = findViewById(R.id.selectionBar)
+                    if (selectionLocal != null) glassEffectHelper.applyGlassEffect(selectionLocal, GlassEffectHelper.GlassIntensity.LIGHT)
+                    android.util.Log.d("LauncherActivity", "Enhanced glass effects applied")
+                } else {
+                    // Fallback to old method
+                    applyGlassBlurIfPossible(homeScreen, 18f)
                     applyGlassBlurIfPossible(dock, 20f)
                     applyGlassBlurIfPossible(sidebar, 20f)
                     val searchLocal: View? = findViewById(R.id.searchBox)
                     if (searchLocal != null) applyGlassBlurIfPossible(searchLocal, 16f)
                     val selectionLocal: View? = findViewById(R.id.selectionBar)
                     if (selectionLocal != null) applyGlassBlurIfPossible(selectionLocal, 16f)
-                    android.util.Log.d("LauncherActivity", "Glass blur applied")
-                } catch (e: Exception) {
-                    android.util.Log.e("LauncherActivity", "Glass blur failed", e)
+                    android.util.Log.d("LauncherActivity", "Fallback glass blur applied")
                 }
+            } catch (e: Exception) {
+                android.util.Log.e("LauncherActivity", "Glass effects failed", e)
             }
             
             // Ensure sections are ready before wiring the drawer
@@ -857,8 +1618,7 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
             // Initialize battery optimizer for adaptive performance
             try {
                 batteryOptimizer = BatteryOptimizer(this)
-                lifecycle.addObserver(batteryOptimizer)
-                batteryOptimizer.initialize()
+                ramOptimizer = RAMOptimizer(this)
             } catch (_: Throwable) { }
 
             // Enable drop targets (dock, sidebar, home)
@@ -910,7 +1670,7 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                     override fun onGestureDetected(gestureType: GestureManager.GestureType, event: MotionEvent?): Boolean {
                         // Resolve configured action
                         val cfg = gestureManager.getGestureConfig(gestureType)
-                        return handleGestureAction(cfg.action, cfg.targetPackage)
+                        return handleGestureAction(cfg.action.toString(), cfg.targetPackage)
                     }
                 }
                 // Register for primary gestures we support on home
@@ -955,7 +1715,11 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
             try {
                 gestureDetector = GestureDetectorCompat(this, object : GestureDetector.SimpleOnGestureListener() {
                     override fun onDown(e: MotionEvent): Boolean {
-                        return true
+                        // Only handle down events from the center area of the screen
+                        val screenWidth = resources.displayMetrics.widthPixels
+                        val centerStart = screenWidth * 0.25f
+                        val centerEnd = screenWidth * 0.75f
+                        return e.x >= centerStart && e.x <= centerEnd
                     }
 
                     override fun onFling(
@@ -965,23 +1729,44 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                         velocityY: Float
                     ): Boolean {
                         if (e1 == null) return false
+                        
+                        // Get screen dimensions
+                        val screenWidth = resources.displayMetrics.widthPixels
+                        val screenHeight = resources.displayMetrics.heightPixels
+                        
+                        // Define center area (avoid edges where sidebar/drawer touches happen)
+                        val centerStart = screenWidth * 0.25f
+                        val centerEnd = screenWidth * 0.75f
+                        val topThird = screenHeight * 0.33f
+                        val bottomThird = screenHeight * 0.67f
+                        
+                        // Check if swipe started from center area
+                        val startX = e1.x
+                        val startY = e1.y
+                        if (startX < centerStart || startX > centerEnd) {
+                            return false // Ignore swipes from sides
+                        }
+                        
                         val diffY = e2.y - e1.y
                         val diffX = e2.x - e1.x
+                        
+                        // Require stronger velocity for gesture to avoid conflicts with scrolling
                         val isVertical = kotlin.math.abs(diffY) > kotlin.math.abs(diffX)
-                        val fastEnough = kotlin.math.abs(velocityY) > 800
+                        val fastEnough = kotlin.math.abs(velocityY) > 1200 // Increased from 800
+                        
                         if (isVertical && fastEnough) {
-                            if (diffY < -100) { // Swipe up
+                            if (diffY < -150) { // Swipe up - increased threshold
                                 try {
                                     toggleAppDrawer(true)
                                 } catch (e: Exception) {
                                     android.util.Log.e("LauncherActivity", "Toggle app drawer failed", e)
                                 }
                                 return true
-                            } else if (diffY > 100) { // Swipe down
+                            } else if (diffY > 150 && startY < topThird) { // Swipe down from top third only
                                 try {
-                                    toggleAppDrawer(false)
+                                    startActivity(Intent(this@LauncherActivity, com.sevenk.launcher.search.GlobalSearchActivity::class.java))
                                 } catch (e: Exception) {
-                                    android.util.Log.e("LauncherActivity", "Toggle app drawer failed", e)
+                                    android.util.Log.e("LauncherActivity", "Global search failed", e)
                                 }
                                 return true
                             }
@@ -995,22 +1780,7 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                         distanceX: Float,
                         distanceY: Float
                     ): Boolean {
-                        if (e1 == null) return false
-                        val dy = e2.y - e1.y
-                        val absDx = kotlin.math.abs(e2.x - e1.x)
-                        val absDy = kotlin.math.abs(dy)
-                        if (absDy > absDx && absDy > 150) {
-                            try {
-                                if (dy < 0) {
-                                    toggleAppDrawer(true)
-                                } else {
-                                    toggleAppDrawer(false)
-                                }
-                            } catch (e: Exception) {
-                                android.util.Log.e("LauncherActivity", "Scroll gesture failed", e)
-                            }
-                            return true
-                        }
+                        // Disable onScroll for app drawer control to prevent conflicts
                         return false
                     }
                 })
@@ -1340,9 +2110,17 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
             var dragging = false
             override fun onTouch(v: View?, event: MotionEvent): Boolean {
                 if (!sidebarOverlayEnabled) return false
+                
+                // Only handle edge touches (rightmost 10% of screen)
+                val screenWidth = resources.displayMetrics.widthPixels
+                val rightEdgeStart = screenWidth * 0.9f
+                
                 when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN -> {
                         downX = event.rawX
+                        if (event.rawX < rightEdgeStart) {
+                            return false // Not on right edge
+                        }
                         dragging = true
                         // Ensure sidebar is at start position
                         sidebar.post {
@@ -1798,6 +2576,7 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
         saveFoldersToPrefs(pageIndex)
     }
 
+    @android.annotation.SuppressLint("MissingPermission")
     private fun setWallpaper() {
         // Some OEMs place wallpaper in protected storage requiring READ permissions.
         // Avoid crashing: try/catch and fall back to a neutral transparent background.
@@ -1879,11 +2658,9 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
         return loadWidgetIdsForPage(contentIndex).isNotEmpty()
     }
 
-    private fun addAppWidget(appWidgetId: Int) {
+    private fun addAppWidget(appWidgetId: Int, contentIndex: Int) {
         val info = appWidgetManager.getAppWidgetInfo(appWidgetId)
         val hostView = appWidgetHost.createView(this, appWidgetId, info)
-        // Map current pager position to content page index (Stan at 0; clamp to content pages only)
-        val contentIndex = (homePager.currentItem - 2).coerceIn(0, NORMAL_HOME_PAGES - 1)
         val frag = supportFragmentManager.fragments.firstOrNull { f ->
             (f is HomePageFragment) && f.getPageIndex() == contentIndex
         } as? HomePageFragment
@@ -1954,7 +2731,7 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
         }
     }
 
-    private fun configureOrAddWidget(appWidgetId: Int, configure: ComponentName?) {
+    private fun configureOrAddWidget(appWidgetId: Int, configure: ComponentName?, contentIndex: Int) {
         if (configure != null) {
             val intent = Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE).apply {
                 component = configure
@@ -1964,10 +2741,10 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                 startActivityForResult(intent, REQ_CONFIGURE_APPWIDGET)
             } catch (_: Throwable) {
                 // If config activity fails, just add directly
-                addAppWidget(appWidgetId)
+                addAppWidget(appWidgetId, contentIndex)
             }
         } else {
-            addAppWidget(appWidgetId)
+            addAppWidget(appWidgetId, contentIndex)
         }
     }
 
@@ -1983,6 +2760,24 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
             startEditDockMode()
         }, showLabels = isShowLabels(), iconSizePx = getDockIconSizePx(), iconPackHelper = iconPackHelper)
         dock.adapter = dockAdapter
+        
+        // Apply enhanced glass effect to dock
+        try {
+            glassEffectHelper.applyGlassEffect(
+                view = dock,
+                intensity = GlassEffectHelper.GlassIntensity.NORMAL
+            )
+            Log.d("LauncherActivity", "Enhanced glass effect applied to dock successfully")
+        } catch (e: Exception) {
+            Log.e("LauncherActivity", "Failed to apply enhanced glass effect to dock", e)
+            // Fallback to basic glass effect if available
+            try {
+                applyGlassBlurIfPossible(dock, 20f)
+            } catch (fallbackException: Exception) {
+                Log.e("LauncherActivity", "Fallback glass effect also failed", fallbackException)
+            }
+        }
+        
         // Spacing between dock items
         dock.addItemDecoration(SpaceItemDecoration(dp(8), RecyclerView.HORIZONTAL))
         dock.setHasFixedSize(true)
@@ -2005,13 +2800,44 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
             showSidebarItemOptions(app)
         }, showLabels = isShowLabels(), iconSizePx = getSidebarIconSizePx(), iconPackHelper = iconPackHelper)
         sidebar.adapter = sidebarAdapter
+        
+        // Apply enhanced glass effect to sidebar
+        try {
+            glassEffectHelper.applyGlassEffect(
+                view = sidebar,
+                intensity = GlassEffectHelper.GlassIntensity.LIGHT
+            )
+            Log.d("LauncherActivity", "Enhanced glass effect applied to sidebar successfully")
+        } catch (e: Exception) {
+            Log.e("LauncherActivity", "Failed to apply enhanced glass effect to sidebar", e)
+            // Fallback to basic glass effect if available
+            try {
+                applyGlassBlurIfPossible(sidebar, 20f)
+            } catch (fallbackException: Exception) {
+                Log.e("LauncherActivity", "Fallback glass effect for sidebar also failed", fallbackException)
+            }
+        }
+        
         // Spacing between sidebar items
         sidebar.addItemDecoration(SpaceItemDecoration(dp(8), RecyclerView.VERTICAL))
         sidebar.setHasFixedSize(true)
         // Smooth scrolling tweaks
         (sidebar.itemAnimator as? androidx.recyclerview.widget.SimpleItemAnimator)?.supportsChangeAnimations = false
-        sidebar.isNestedScrollingEnabled = false
+        sidebar.isNestedScrollingEnabled = true // Enable nested scrolling for better touch handling
         sidebar.setItemViewCacheSize(20)
+        
+        // Add touch listener to prevent sidebar scrolling from triggering app drawer
+        sidebar.setOnTouchListener { _, event ->
+            // Allow normal scrolling within sidebar, but prevent gesture detection outside
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    // Mark that we're interacting with sidebar
+                    true // Consume the touch event
+                }
+                else -> false // Let RecyclerView handle other events normally
+            }
+        }
+        
         attachDragHelper(sidebar, sidebarAdapter, isDock = false)
         rebuildSidebar()
     }
@@ -2249,16 +3075,18 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
             appDrawerContainer.animate()
                 .translationY(0f)
                 .alpha(1f)
-                .setDuration(try { batteryOptimizer.getAnimationDuration(220) } catch (_: Throwable) { 220 })
+                .setDuration(180)
                 .setInterpolator(DecelerateInterpolator())
+                .withLayer()
                 .withEndAction { appDrawerContainer.translationY = 0f }
                 .start()
         } else {
             appDrawerContainer.animate()
                 .translationY(h.toFloat())
                 .alpha(0f)
-                .setDuration(try { batteryOptimizer.getAnimationDuration(200) } catch (_: Throwable) { 200 })
+                .setDuration(160)
                 .setInterpolator(DecelerateInterpolator())
+                .withLayer()
                 .withEndAction {
                     appDrawerContainer.visibility = View.GONE
                     appDrawerContainer.translationY = 0f
@@ -2407,18 +3235,61 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        return gestureDetector.onTouchEvent(event) || super.onTouchEvent(event)
+        // Only handle gestures if not inside app drawer or sidebar
+        if (!isTouchInAppDrawer(event) && !isTouchInSidebar(event)) {
+            // Use the configured gesture detector instance (avoid creating new detectors per event)
+            return gestureDetector.onTouchEvent(event) || super.onTouchEvent(event)
+        }
+        return super.onTouchEvent(event)
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        // Ensure the detector always has a chance to analyze the gesture,
-        // even if child views handle the touch events.
-        gestureDetector.onTouchEvent(ev)
+        // Only dispatch global gestures if not inside interactive areas
+        if (!isTouchInAppDrawer(ev) && !isTouchInSidebar(ev)) {
+            gestureDetector.onTouchEvent(ev)
+        }
         return super.dispatchTouchEvent(ev)
+    }
+    
+    private fun isTouchInAppDrawer(event: MotionEvent): Boolean {
+        if (!::appDrawerContainer.isInitialized || appDrawerContainer.visibility != View.VISIBLE) {
+            return false
+        }
+        
+        val location = IntArray(2)
+        appDrawerContainer.getLocationOnScreen(location)
+        val x = event.rawX.toInt()
+        val y = event.rawY.toInt()
+        
+        return x >= location[0] && 
+               x <= location[0] + appDrawerContainer.width &&
+               y >= location[1] && 
+               y <= location[1] + appDrawerContainer.height
+    }
+    
+    private fun isTouchInSidebar(event: MotionEvent): Boolean {
+        if (!::sidebar.isInitialized || sidebar.visibility != View.VISIBLE) {
+            return false
+        }
+        
+        val location = IntArray(2)
+        sidebar.getLocationOnScreen(location)
+        val x = event.rawX.toInt()
+        val y = event.rawY.toInt()
+        
+        return x >= location[0] && 
+               x <= location[0] + sidebar.width &&
+               y >= location[1] && 
+               y <= location[1] + sidebar.height
     }
 
     private fun startAddWidgetFlow() {
         val appWidgetId = appWidgetHost.allocateAppWidgetId()
+        val contentIndex = (homePager.currentItem - 2).coerceIn(0, NORMAL_HOME_PAGES - 1)
+        prefs.edit()
+            .putInt(KEY_WIDGET_ID, appWidgetId)
+            .putInt("widget_page_index", contentIndex)
+            .apply()
         val pickIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_PICK)
         pickIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
         startActivityForResult(pickIntent, REQ_PICK_APPWIDGET)
@@ -2493,10 +3364,11 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
             REQ_PICK_APPWIDGET -> {
                 val appWidgetId = data?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1) ?: -1
                 if (appWidgetId != -1) {
+                    val pageIndex = prefs.getInt("widget_page_index", 0)
                     // Try to bind if allowed, otherwise request bind
                     val info = appWidgetManager.getAppWidgetInfo(appWidgetId)
                     if (info != null && appWidgetManager.bindAppWidgetIdIfAllowed(appWidgetId, info.profile, info.provider, null)) {
-                        configureOrAddWidget(appWidgetId, info.configure)
+                        configureOrAddWidget(appWidgetId, info.configure, pageIndex)
                     } else {
                         val bindIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_BIND)
                         bindIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
@@ -2508,16 +3380,22 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
             REQ_BIND_APPWIDGET -> {
                 val appWidgetId = data?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1) ?: -1
                 if (appWidgetId != -1) {
-                    val info = appWidgetManager.getAppWidgetInfo(appWidgetId)
-                    configureOrAddWidget(appWidgetId, info?.configure)
+                    val pageIndex = prefs.getInt("widget_page_index", -1)
+                    if (pageIndex != -1) {
+                        val info = appWidgetManager.getAppWidgetInfo(appWidgetId)
+                        configureOrAddWidget(appWidgetId, info?.configure, pageIndex)
+                    }
                 }
             }
             REQ_CONFIGURE_APPWIDGET -> {
                 val appWidgetId = data?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1) ?: -1
                 if (appWidgetId != -1) {
-                    addAppWidget(appWidgetId)
-                    // Nudge list data to refresh after config
-                    try { appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.listView) } catch (_: Throwable) {}
+                    val pageIndex = prefs.getInt("widget_page_index", -1)
+                    if (pageIndex != -1) {
+                        addAppWidget(appWidgetId, pageIndex)
+                        // Nudge list data to refresh after config
+                        try { appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.listView) } catch (_: Throwable) {}
+                    }
                 }
             }
             REQ_PICK_BACKGROUND -> {
@@ -2525,8 +3403,9 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                     val uri = data?.data
                     if (uri != null) {
                         try {
-                            // Persist permission so we can read after reboot
-                            val flags = (data.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION))
+                            // Persist read/write permissions only (persistable flag is not accepted by this API)
+                            val flags = data.flags and
+                                (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                             try { contentResolver.takePersistableUriPermission(uri, flags) } catch (_: Throwable) {}
                             // Save and apply
                             prefs.edit().putString(customBackgroundKey(), uri.toString()).apply()
@@ -2553,6 +3432,13 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                 val intent = Intent(this, com.sevenk.calcvault.MainActivity::class.java)
                 startActivity(intent)
                 recordRecent(INTERNAL_CALC_PKG)
+                return
+            }
+            // Internal 7K Study
+            if (app.packageName == INTERNAL_STUDY_PKG) {
+                val intent = Intent(this, StudyActivity::class.java)
+                startActivity(intent)
+                recordRecent(INTERNAL_STUDY_PKG)
                 return
             }
             // Internal 7KLAWPREP PWA wrapper
@@ -2605,47 +3491,125 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                 return
             }
             if (app.packageName == INTERNAL_CALENDAR2_PKG) {
-                val intent = Intent(this, WebAppActivity::class.java)
-                intent.putExtra(WebAppActivity.EXTRA_TITLE, "7K Calendar")
-                intent.putExtra(WebAppActivity.EXTRA_URL, "https://calendar.7klawprep.me/")
+                val intent = Intent(this, com.sevenk.launcher.ecosystem.CalendarActivity::class.java)
                 startActivity(intent)
                 recordRecent(INTERNAL_CALENDAR2_PKG)
                 return
             }
             if (app.packageName == INTERNAL_WEATHER_PKG) {
-                val intent = Intent(this, WebAppActivity::class.java)
-                intent.putExtra(WebAppActivity.EXTRA_TITLE, "7K Weather")
-                intent.putExtra(WebAppActivity.EXTRA_URL, "https://weather.7klawprep.me/")
+                val intent = Intent(this, com.sevenk.launcher.ecosystem.WeatherActivity::class.java)
                 startActivity(intent)
                 recordRecent(INTERNAL_WEATHER_PKG)
                 return
             }
             if (app.packageName == INTERNAL_MUSIC_PKG) {
-                val intent = Intent(this, WebAppActivity::class.java)
-                intent.putExtra(WebAppActivity.EXTRA_TITLE, "7K Music")
-                intent.putExtra(WebAppActivity.EXTRA_URL, "https://music.7klawprep.me/")
+                val intent = Intent(this, com.sevenk.launcher.ecosystem.MusicActivity::class.java)
                 startActivity(intent)
                 recordRecent(INTERNAL_MUSIC_PKG)
                 return
             }
+            if (app.packageName == INTERNAL_UTILITY_PKG) {
+                val intent = Intent(this, com.sevenk.launcher.ecosystem.UtilityActivity::class.java)
+                startActivity(intent)
+                recordRecent(INTERNAL_UTILITY_PKG)
+                return
+            }
+            if (app.packageName == INTERNAL_GAMES_PKG) {
+                val intent = Intent(this, com.sevenk.launcher.ecosystem.GamesActivity::class.java)
+                startActivity(intent)
+                recordRecent(INTERNAL_GAMES_PKG)
+                return
+            }
+            if (app.packageName == INTERNAL_WIDGETS_PKG) {
+                val intent = Intent(this, com.sevenk.launcher.ecosystem.WidgetsHubActivity::class.java)
+                startActivity(intent)
+                recordRecent(INTERNAL_WIDGETS_PKG)
+                return
+            }
+            if (app.packageName == INTERNAL_APPSTORE_PKG) {
+                val intent = Intent(this, com.sevenk.launcher.ecosystem.AppStoreActivity::class.java)
+                startActivity(intent)
+                recordRecent(INTERNAL_APPSTORE_PKG)
+                return
+            }
+            if (app.packageName == INTERNAL_SMART_NOTES_PLUS_PKG) {
+                val intent = Intent(this, com.sevenk.launcher.notes.ui.NotesActivity::class.java)
+                startActivity(intent)
+                recordRecent(INTERNAL_SMART_NOTES_PLUS_PKG)
+                return
+            }
+            if (app.packageName == INTERNAL_TASKS_COMMANDER_PKG) {
+                val intent = Intent(this, com.sevenk.launcher.ecosystem.TasksCommanderActivity::class.java)
+                startActivity(intent)
+                recordRecent(INTERNAL_TASKS_COMMANDER_PKG)
+                return
+            }
+            if (app.packageName == INTERNAL_FILE_FORGE_PKG) {
+                val intent = Intent(this, com.sevenk.launcher.ecosystem.FileForgeActivity::class.java)
+                startActivity(intent)
+                recordRecent(INTERNAL_FILE_FORGE_PKG)
+                return
+            }
+            if (app.packageName == INTERNAL_BUDGET_GUARDIAN_PKG) {
+                val intent = Intent(this, com.sevenk.launcher.ecosystem.BudgetGuardianActivity::class.java)
+                startActivity(intent)
+                recordRecent(INTERNAL_BUDGET_GUARDIAN_PKG)
+                return
+            }
+            if (app.packageName == INTERNAL_PRIVACY_SHIELD_PKG) {
+                val intent = Intent(this, com.sevenk.launcher.ecosystem.PrivacyShieldActivity::class.java)
+                startActivity(intent)
+                recordRecent(INTERNAL_PRIVACY_SHIELD_PKG)
+                return
+            }
+            if (app.packageName == INTERNAL_BATTERY_DOCTOR_PKG) {
+                val intent = Intent(this, com.sevenk.launcher.ecosystem.BatteryDoctorActivity::class.java)
+                startActivity(intent)
+                recordRecent(INTERNAL_BATTERY_DOCTOR_PKG)
+                return
+            }
+            if (app.packageName == INTERNAL_STUDIO_TEMPLATES_PKG) {
+                val intent = Intent(this, com.sevenk.launcher.ecosystem.StudioTemplatesActivity::class.java)
+                startActivity(intent)
+                recordRecent(INTERNAL_STUDIO_TEMPLATES_PKG)
+                return
+            }
+            if (app.packageName == INTERNAL_OFFLINE_APPSTORE_PKG) {
+                val intent = Intent(this, com.sevenk.launcher.ecosystem.OfflineFirstAppStoreActivity::class.java)
+                startActivity(intent)
+                recordRecent(INTERNAL_OFFLINE_APPSTORE_PKG)
+                return
+            }
+            // Internal 7K Settings
+            if (app.packageName == "internal.7ksettings") {
+                val intent = Intent(this, SettingsActivity::class.java)
+                startActivity(intent)
+                return
+            }
+            
+            // Internal 7K Enhanced Settings
+            if (app.packageName == "internal.7kenhancedsettings") {
+                val intent = Intent(this, com.sevenk.launcher.settings.EnhancedSettingsActivity::class.java)
+                startActivity(intent)
+                return
+            }
+            
+            // Internal 7K Browser
+            if (app.packageName == "internal.7kbrowser") {
+                try {
+                    val intent = Intent(this, com.sevenk.browser.BrowserActivity::class.java)
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    Toast.makeText(this, "7K Browser not available", Toast.LENGTH_SHORT).show()
+                }
+                return
+            }
+            
             // Internal 7KSTUDIO launcher
             if (app.packageName == INTERNAL_STUDIO_PKG) {
                 val intent = Intent(this, com.sevenk.studio.StudioActivity::class.java)
                 startActivity(intent)
                 recordRecent(INTERNAL_STUDIO_PKG)
-                return
-            }
-            
-            // 7K Browser
-            if (app.packageName == "com.sevenk.browser") {
-                try {
-                    // Use direct reference to avoid reflection issues with minify/ProGuard
-                    val intent = Intent(this, com.sevenk.browser.BrowserActivity::class.java)
-                    startActivity(intent)
-                    recordRecent("com.sevenk.browser")
-                } catch (e: Exception) {
-                    Toast.makeText(this, "7K Browser not available", Toast.LENGTH_SHORT).show()
-                }
                 return
             }
             // Default: use package manager
@@ -2684,7 +3648,8 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
             } catch (_: Throwable) { false }
             if (bound) {
                 val info = appWidgetManager.getAppWidgetInfo(appWidgetId)
-                configureOrAddWidget(appWidgetId, info?.configure)
+                val contentIndex = prefs.getInt("widget_page_index", 0)
+                configureOrAddWidget(appWidgetId, info?.configure, contentIndex)
             } else {
                 // Request bind permission from system
                 val bindIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_BIND).apply {

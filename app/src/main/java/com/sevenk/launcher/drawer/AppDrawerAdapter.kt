@@ -67,6 +67,9 @@ class AppDrawerAdapter(
     
     // Show alphabet headers
     private var showAlphabetHeaders: Boolean = true
+    
+    // Current search query to preserve when updating display
+    private var currentSearchQuery: String = ""
 
     // Standard categories
     private val allCategories = listOf("All", "Work", "Games", "Social", "Utilities")
@@ -83,7 +86,6 @@ class AppDrawerAdapter(
         val prefs = PreferenceManager.getDefaultSharedPreferences(context)
         sortOrder = prefs.getString("drawer_sort_order", "az") ?: "az"
         showAlphabetHeaders = prefs.getBoolean("drawer_alphabet_headers", true)
-    }
     }
 
     /**
@@ -156,7 +158,6 @@ class AppDrawerAdapter(
         }
         
         return items
-    }
     }
 
     /**
@@ -290,16 +291,6 @@ class AppDrawerAdapter(
         return categoryMap.mapValues { (_, apps) -> apps.size }
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): AppViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_app, parent, false)
-        return AppViewHolder(view)
-    }
-
-    override fun onBindViewHolder(holder: AppViewHolder, position: Int) {
-        val app = filteredApps[position]
-        holder.bind(app)
-    }
 
     override fun getItemViewType(position: Int): Int {
         return when (displayItems[position]) {
@@ -332,6 +323,7 @@ class AppDrawerAdapter(
     override fun getFilter(): Filter = object : Filter() {
         override fun performFiltering(constraint: CharSequence?): FilterResults {
             val query = constraint?.toString()?.lowercase(Locale.getDefault()) ?: ""
+            currentSearchQuery = query
 
             val filteredList = if (query.isEmpty()) {
                 // No filter, use current category
@@ -445,14 +437,28 @@ class AppDrawerAdapter(
         }
     }
     
-    private fun updateDisplay() {
-        filteredApps = if (currentCategory == null || currentCategory == "All") {
-            sortApps(allApps)
-        } else {
-            sortApps(categoryMap[currentCategory].orEmpty())
-        }
-        displayItems = generateDisplayItems()
-        notifyDataSetChanged()
+    /**
+     * Clears the current search query (used when search is cleared)
+     */
+    fun clearSearch() {
+        currentSearchQuery = ""
+        updateDisplay()
     }
+    
+    private fun updateDisplay() {
+        // If there's an active search, reapply the filter instead of showing all apps
+        if (currentSearchQuery.isNotEmpty()) {
+            // Reapply the current search filter
+            filter.filter(currentSearchQuery)
+        } else {
+            // No search active, show apps based on current category
+            filteredApps = if (currentCategory == null || currentCategory == "All") {
+                sortApps(allApps)
+            } else {
+                sortApps(categoryMap[currentCategory].orEmpty())
+            }
+            displayItems = generateDisplayItems()
+            notifyDataSetChanged()
+        }
     }
 }

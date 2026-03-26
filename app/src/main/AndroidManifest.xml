@@ -37,6 +37,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.SevenKLauncher"
         android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config"
         tools:replace="android:label,android:theme">
         
         <!-- 7K Browser (Embedded App) -->
@@ -46,7 +47,11 @@
             android:label="7K Browser"
             android:icon="@mipmap/ic_launcher_browser"
             android:theme="@style/Theme.SevenK.Browser">
-            <!-- No MAIN/LAUNCHER intent filter - launched internally from launcher -->
+            <!-- Add MAIN/LAUNCHER intent filter so it appears in app drawer -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -82,6 +87,14 @@
             android:icon="@drawable/ic_settings_7k">
         </activity>
 
+        <!-- Enhanced Settings -->
+        <activity
+            android:name=".settings.EnhancedSettingsActivity"
+            android:exported="false"
+            android:label="Enhanced Settings"
+            android:theme="@style/Theme.SevenKLauncher"
+            android:parentActivityName=".LauncherActivity" />
+
         <!-- Expose a settings shortcut in the app drawer named 7KSettings -->
         <activity-alias
             android:name=".SettingsShortcut"
@@ -116,6 +129,27 @@
             android:name=".AppPrivacyActivity"
             android:exported="false"
             android:label="Privacy"
+            android:theme="@style/Theme.SevenKLauncher" />
+
+        <!-- System Monitor -->
+        <activity
+            android:name=".SystemMonitorActivity"
+            android:exported="false"
+            android:label="System Monitor"
+            android:theme="@style/Theme.SevenKLauncher" />
+
+        <!-- Study Activity -->
+        <activity
+            android:name=".StudyActivity"
+            android:exported="false"
+            android:label="7K Study"
+            android:theme="@style/Theme.SevenKLauncher" />
+
+        <!-- Global Search -->
+        <activity
+            android:name=".search.GlobalSearchActivity"
+            android:exported="false"
+            android:label="Search"
             android:theme="@style/Theme.SevenKLauncher" />
 
         <receiver
@@ -192,6 +226,77 @@
             android:label="@string/note_editor_title"
             android:theme="@style/Theme.SevenKLauncher" />
 
+        <!-- 7K Native Ecosystem Apps -->
+        <activity
+            android:name="com.sevenk.launcher.ecosystem.UtilityActivity"
+            android:exported="false"
+            android:label="7K Utility"
+            android:theme="@style/Theme.SevenKLauncher" />
+        <activity
+            android:name="com.sevenk.launcher.ecosystem.GamesActivity"
+            android:exported="false"
+            android:label="7K Games"
+            android:theme="@style/Theme.SevenKLauncher" />
+        <activity
+            android:name="com.sevenk.launcher.ecosystem.WidgetsHubActivity"
+            android:exported="false"
+            android:label="7K Widgets"
+            android:theme="@style/Theme.SevenKLauncher" />
+        <activity
+            android:name="com.sevenk.launcher.ecosystem.AppStoreActivity"
+            android:exported="false"
+            android:label="7K AppStore"
+            android:theme="@style/Theme.SevenKLauncher" />
+        <activity
+            android:name="com.sevenk.launcher.ecosystem.TasksCommanderActivity"
+            android:exported="false"
+            android:label="7K Tasks Commander"
+            android:theme="@style/Theme.SevenKLauncher" />
+        <activity
+            android:name="com.sevenk.launcher.ecosystem.FileForgeActivity"
+            android:exported="false"
+            android:label="7K File Forge"
+            android:theme="@style/Theme.SevenKLauncher" />
+        <activity
+            android:name="com.sevenk.launcher.ecosystem.BudgetGuardianActivity"
+            android:exported="false"
+            android:label="7K Budget Guardian"
+            android:theme="@style/Theme.SevenKLauncher" />
+        <activity
+            android:name="com.sevenk.launcher.ecosystem.PrivacyShieldActivity"
+            android:exported="false"
+            android:label="7K Privacy Shield"
+            android:theme="@style/Theme.SevenKLauncher" />
+        <activity
+            android:name="com.sevenk.launcher.ecosystem.BatteryDoctorActivity"
+            android:exported="false"
+            android:label="7K Battery Doctor"
+            android:theme="@style/Theme.SevenKLauncher" />
+        <activity
+            android:name="com.sevenk.launcher.ecosystem.StudioTemplatesActivity"
+            android:exported="false"
+            android:label="7K Studio Templates"
+            android:theme="@style/Theme.SevenKLauncher" />
+        <activity
+            android:name="com.sevenk.launcher.ecosystem.OfflineFirstAppStoreActivity"
+            android:exported="false"
+            android:label="7K Offline First AppStore"
+            android:theme="@style/Theme.SevenKLauncher" />
+        <activity
+            android:name="com.sevenk.launcher.ecosystem.CalendarActivity"
+            android:exported="false"
+            android:label="7K Calendar"
+            android:theme="@style/Theme.SevenKLauncher" />
+        <activity
+            android:name="com.sevenk.launcher.ecosystem.MusicActivity"
+            android:exported="false"
+            android:label="7K Music"
+            android:theme="@style/Theme.SevenKLauncher" />
+        <activity
+            android:name="com.sevenk.launcher.ecosystem.WeatherActivity"
+            android:exported="false"
+            android:label="7K Weather"
+            android:theme="@style/Theme.SevenKLauncher" />
         <!-- Add FileProvider for file sharing if needed -->
         <provider
             android:name="androidx.core.content.FileProvider"

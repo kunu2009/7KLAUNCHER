@@ -3,6 +3,7 @@ package com.sevenk.launcher
 import android.content.ComponentName
 import android.content.pm.ApplicationInfo
 import android.graphics.drawable.Drawable
+import com.sevenk.launcher.UsageStats
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
@@ -15,7 +16,9 @@ data class AppInfo(
     val packageName: String,
     val className: String,
     @Transient val icon: Drawable? = null,
-    @Transient val applicationInfo: ApplicationInfo? = null
+    @Transient val applicationInfo: ApplicationInfo? = null,
+    @Transient val usageStats: UsageStats? = null,
+    val isPWA: Boolean = false
 ) {
     val componentName: ComponentName
         get() = ComponentName(packageName, className)

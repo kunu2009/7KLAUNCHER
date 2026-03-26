@@ -236,6 +236,23 @@ class AppPrivacyManager(private val context: Context) {
     }
     
     /**
+     * Toggle global privacy mode on/off
+     */
+    fun togglePrivacyMode() {
+        val isEnabled = prefs.getBoolean("privacy_mode_enabled", false)
+        prefs.edit()
+            .putBoolean("privacy_mode_enabled", !isEnabled)
+            .apply()
+    }
+    
+    /**
+     * Check if privacy mode is enabled
+     */
+    fun isPrivacyModeEnabled(): Boolean {
+        return prefs.getBoolean("privacy_mode_enabled", false)
+    }
+
+    /**
      * Clear all privacy settings
      */
     fun clearAllPrivacySettings() {

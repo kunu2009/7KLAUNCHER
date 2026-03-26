@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">7K Launcher</string>
     <string name="app_short_name">7K Launcher</string>
+    <string name="app_icon">App Icon</string>
     
     <!-- Browser UI strings -->
     <string name="home">Home</string>
@@ -55,12 +56,12 @@
     <string name="settings_section_wallpaper">Wallpaper</string>
     <string name="settings_section_storage">Storage</string>
     <string name="choose_from_gallery">Choose from gallery</string>
-    <string name="choose_preloaded">Choose from preloaded</string>
+    <string name="choose_preloaded">Choose from 7K wallpaper store</string>
     <string name="storage_summary">App: %1$s\nUser data: %2$s\nCache: %3$s</string>
     <string name="clear_cache">Clear cache</string>
     <string name="clear_web_data">Clear web data</string>
     <string name="clear_temp_files">Clear temp files</string>
-    <string name="no_preloaded_wallpapers">No preloaded wallpapers available yet</string>
+    <string name="no_preloaded_wallpapers">No wallpapers found in 7K wallpaper store</string>
     <string name="wallpaper_applied">Wallpaper applied</string>
     <string name="error_applying_wallpaper">Error applying wallpaper</string>
     <string name="dynamic_color">Dynamic color (Material You)</string>

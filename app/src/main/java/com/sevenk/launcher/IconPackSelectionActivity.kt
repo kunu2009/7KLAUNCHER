@@ -9,6 +9,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -66,7 +67,7 @@ class IconPackSelectionActivity : AppCompatActivity() {
                 val defaultIconPack = IconPackManager.IconPack(
                     packageName = "",
                     name = getString(R.string.system_icons),
-                    previewDrawable = getDrawable(R.drawable.ic_system_icons)
+                    previewDrawable = AppCompatResources.getDrawable(this@IconPackSelectionActivity, R.drawable.ic_system_icons)
                 )
 
                 // Scan for installed icon packs
@@ -155,7 +156,7 @@ class IconPackSelectionActivity : AppCompatActivity() {
     }
     
     override fun onSupportNavigateUp(): Boolean {
-        onBackPressed()
+        onBackPressedDispatcher.onBackPressed()
         return true
     }
 }

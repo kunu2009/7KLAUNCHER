@@ -149,6 +149,7 @@ class PerformanceOptimizer(private val context: Context) {
     /**
      * Debounce scroll events for better performance
      */
+    @android.annotation.SuppressLint("NewApi")
     fun debounceScrollEvent(action: () -> Unit) {
         mainHandler.removeCallbacksAndMessages("scroll_debounce")
         mainHandler.postDelayed({

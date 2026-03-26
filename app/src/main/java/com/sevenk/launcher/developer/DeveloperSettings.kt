@@ -4,6 +4,9 @@ import android.content.Context
 import android.os.Build
 import com.sevenk.launcher.errors.ErrorReporter
 import com.sevenk.launcher.performance.PerformanceOptimizer
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * Hidden developer settings menu
@@ -88,7 +91,13 @@ class DeveloperSettings(private val context: Context) {
     private fun getAppVersion(): String {
         return try {
             val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            "${packageInfo.versionName} (${packageInfo.versionCode})"
+            val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                packageInfo.longVersionCode
+            } else {
+                @Suppress("DEPRECATION")
+                packageInfo.versionCode.toLong()
+            }
+            "${packageInfo.versionName} ($versionCode)"
         } catch (e: Exception) {
             "Unknown"
         }
@@ -138,7 +147,7 @@ class DeveloperSettings(private val context: Context) {
         
         return buildString {
             appendLine("=== 7K LAUNCHER DEBUG EXPORT ===")
-            appendLine("Generated: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(java.util.Date())}")
+            appendLine("Generated: ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())}")
             appendLine()
             
             appendLine("=== SYSTEM INFO ===")

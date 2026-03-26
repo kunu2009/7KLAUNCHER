@@ -10,11 +10,15 @@ import android.media.MediaMuxer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
+import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.MediaController
 import android.widget.VideoView
+import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
 import com.sevenk.launcher.R
 import java.io.File
@@ -25,12 +29,53 @@ class VideoEditorActivity : AppCompatActivity() {
     private var pickedVideo: Uri? = null
     private var pickedMusic: Uri? = null
     private var videoDurationMs: Long = 0L
+    private var previewVideoVolume: Float = 0.7f
+    private var previewMusicVolume: Float = 0.7f
+    private lateinit var seekPreview: SeekBar
+    private lateinit var tvCurrentTime: TextView
+    private lateinit var tvDuration: TextView
+    private var userScrubbing = false
+    private val previewHandler = Handler(Looper.getMainLooper())
+    private val previewTicker = object : Runnable {
+        override fun run() {
+            try {
+                if (!userScrubbing && ::seekPreview.isInitialized) {
+                    val pos = videoView.currentPosition.coerceAtLeast(0)
+                    seekPreview.progress = pos
+                    tvCurrentTime.text = formatMs(pos.toLong())
+                }
+            } catch (_: Throwable) {}
+            previewHandler.postDelayed(this, 180L)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_video_editor)
         infoText = findViewById(R.id.info)
         videoView = findViewById(R.id.videoView)
+        seekPreview = findViewById(R.id.seekPreview)
+        tvCurrentTime = findViewById(R.id.tvCurrentTime)
+        tvDuration = findViewById(R.id.tvDuration)
+        tvCurrentTime.text = "00:00"
+        tvDuration.text = "00:00"
+
+        seekPreview.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    try { videoView.seekTo(progress) } catch (_: Throwable) {}
+                    tvCurrentTime.text = formatMs(progress.toLong())
+                }
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                userScrubbing = true
+            }
+
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                userScrubbing = false
+            }
+        })
         try {
             val controller = MediaController(this)
             controller.setAnchorView(videoView)
@@ -49,6 +94,77 @@ class VideoEditorActivity : AppCompatActivity() {
         findViewById<android.view.View>(R.id.btnPickMusic).setOnClickListener { pickMusic() }
         findViewById<android.view.View>(R.id.btnExportWithMusic).setOnClickListener { exportWithMusicReplace() }
         findViewById<android.view.View>(R.id.btnExportTrimRange).setOnClickListener { exportTrimRange() }
+
+        configureResponsiveButtonLabels()
+        applyTemplateHintIfProvided()
+
+        val seekVolVideo = findViewById<android.widget.SeekBar>(R.id.seekVolVideo)
+        val seekVolMusic = findViewById<android.widget.SeekBar>(R.id.seekVolMusic)
+        seekVolVideo.progress = (previewVideoVolume * 100f).toInt()
+        seekVolMusic.progress = (previewMusicVolume * 100f).toInt()
+
+        seekVolVideo.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                previewVideoVolume = (progress / 100f).coerceIn(0f, 1f)
+                try { videoView.setOnPreparedListener { mp -> mp.setVolume(previewVideoVolume, previewVideoVolume) } } catch (_: Throwable) {}
+            }
+            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
+        })
+
+        seekVolMusic.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                previewMusicVolume = (progress / 100f).coerceIn(0f, 1f)
+            }
+            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
+        })
+
+        previewHandler.post(previewTicker)
+    }
+
+    private fun configureResponsiveButtonLabels() {
+        val widthDp = resources.displayMetrics.widthPixels / resources.displayMetrics.density
+        val compact = widthDp < 390f
+
+        fun setBtn(id: Int, normal: String, compactText: String, desc: String) {
+            val btn = try { findViewById<Button>(id) } catch (_: Throwable) { null } ?: return
+            btn.text = if (compact) compactText else normal
+            btn.contentDescription = desc
+            btn.textSize = if (compact) 11f else 13f
+            btn.isAllCaps = false
+        }
+
+        setBtn(R.id.btnPickVideo, "Import", "Import", "Import video")
+        setBtn(R.id.btnPlayPause, "Play", "Play", "Play or pause video")
+        setBtn(R.id.btnTrim10s, "Trim 10s", "Trim", "Trim first ten seconds")
+        setBtn(R.id.btnRotate90, "Rotate 90°", "Rot90", "Export rotated ninety degrees")
+        setBtn(R.id.btnMuteExport, "Mute Export", "Mute", "Export video without audio")
+        setBtn(R.id.btnExtractFrame, "Extract Frame", "Frame", "Extract current frame as image")
+        setBtn(R.id.btnSpeed05, "0.5x", "0.5x", "Export at half speed")
+        setBtn(R.id.btnSpeed15, "1.5x", "1.5x", "Export at one point five speed")
+        setBtn(R.id.btnSpeed2, "2x", "2x", "Export at double speed")
+        setBtn(R.id.btnPickMusic, "Pick Music", "Music", "Pick replacement music")
+        setBtn(R.id.btnExportWithMusic, "Export + Music", "Exp+Mus", "Export video with selected music")
+        setBtn(R.id.btnExportTrimRange, "Export Trim Range", "Exp Trim", "Export selected trim range")
+    }
+
+    private fun applyTemplateHintIfProvided() {
+        val template = intent.getStringExtra("studio_template_name")?.trim().orEmpty()
+        if (template.isBlank()) return
+
+        val lower = template.lowercase()
+        if (lower.contains("cinematic") || lower.contains("vibrant")) {
+            previewVideoVolume = 0.8f
+            previewMusicVolume = 0.75f
+        } else if (lower.contains("night")) {
+            previewVideoVolume = 0.65f
+            previewMusicVolume = 0.7f
+        }
+
+        findViewById<SeekBar>(R.id.seekVolVideo).progress = (previewVideoVolume * 100f).toInt()
+        findViewById<SeekBar>(R.id.seekVolMusic).progress = (previewMusicVolume * 100f).toInt()
+        infoText.text = "Template loaded: $template"
     }
 
     private fun exportSpeed(factor: Float) {
@@ -552,6 +668,7 @@ class VideoEditorActivity : AppCompatActivity() {
                     videoView.setVideoURI(uri)
                     videoView.visibility = android.view.View.VISIBLE
                     videoView.setOnPreparedListener { mp ->
+                        try { mp.setVolume(previewVideoVolume, previewVideoVolume) } catch (_: Throwable) {}
                         // Display first frame
                         try { videoView.seekTo(1) } catch (_: Throwable) {}
                         try { videoView.start() } catch (_: Throwable) {}
@@ -560,6 +677,11 @@ class VideoEditorActivity : AppCompatActivity() {
                             val retriever = MediaMetadataRetriever(); retriever.setDataSource(this, uri)
                             videoDurationMs = (retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L)
                             retriever.release()
+                            seekPreview.max = videoDurationMs.toInt().coerceAtLeast(1)
+                            seekPreview.progress = 0
+                            tvCurrentTime.text = "00:00"
+                            tvDuration.text = formatMs(videoDurationMs)
+
                             val startSeek = findViewById<android.widget.SeekBar>(R.id.seekStart)
                             val endSeek = findViewById<android.widget.SeekBar>(R.id.seekEnd)
                             val labelStart = findViewById<TextView>(R.id.labelStart)
@@ -597,9 +719,21 @@ class VideoEditorActivity : AppCompatActivity() {
             if (uri != null) {
                 try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Throwable) {}
                 pickedMusic = uri
-                infoText.text = "Music: $uri"
+                infoText.text = "Music selected. Export+Music will replace original audio."
             }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        previewHandler.removeCallbacks(previewTicker)
+    }
+
+    private fun formatMs(ms: Long): String {
+        val totalSec = (ms / 1000L).coerceAtLeast(0L)
+        val min = totalSec / 60L
+        val sec = totalSec % 60L
+        return String.format("%02d:%02d", min, sec)
     }
 
     companion object {

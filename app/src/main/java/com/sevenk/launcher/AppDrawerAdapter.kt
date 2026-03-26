@@ -160,6 +160,7 @@ class AppDrawerAdapter(
 
     private fun bindClicks(holder: AppViewHolder, app: AppInfo) {
         holder.itemView.setOnClickListener {
+            try { holder.itemView.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY) } catch (_: Throwable) {}
             if (selectionMode) {
                 val pos = holder.bindingAdapterPosition
                 if (pos != RecyclerView.NO_POSITION) toggleSelectionAt(pos, app.packageName)
@@ -185,6 +186,9 @@ class AppDrawerAdapter(
         holder.itemView.setOnTouchListener { v, ev ->
             gd.onTouchEvent(ev)
             when (ev.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    v.animate().scaleX(0.96f).scaleY(0.96f).alpha(0.9f).setDuration(90).start()
+                }
                 android.view.MotionEvent.ACTION_MOVE -> {
                     if (longPressed && !startedDrag) {
                         val dx = ev.x - downX
@@ -203,6 +207,7 @@ class AppDrawerAdapter(
                     }
                 }
                 android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                    v.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(110).start()
                     // If we long-pressed but did not begin dragging, treat as context menu request
                     if (longPressed && !startedDrag) {
                         onItemLongPress?.invoke(app)

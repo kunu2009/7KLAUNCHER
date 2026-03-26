@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">7klwprep.me</domain>
+        <domain includeSubdomains="true">polyglot.7kc.me</domain>
+        <domain includeSubdomains="true">his.7kc.me</domain>
+        <domain includeSubdomains="true">eco.7kc.me</domain>
+        <domain includeSubdomains="true">pol.7kc.me</domain>
+    </domain-config>
+    
+    <!-- Allow all HTTPS connections for study domains -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+</network-security-config>

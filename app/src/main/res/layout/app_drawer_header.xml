@@ -29,7 +29,7 @@
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:src="@android:drawable/ic_menu_search"
-                android:tint="@android:color/white"
+                app:tint="@android:color/white"
                 android:contentDescription="Search" />
 
             <EditText
@@ -55,7 +55,7 @@
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:src="@android:drawable/ic_menu_close_clear_cancel"
-                android:tint="@android:color/white"
+                app:tint="@android:color/white"
                 android:visibility="gone"
                 android:contentDescription="Clear search" />
         </LinearLayout>

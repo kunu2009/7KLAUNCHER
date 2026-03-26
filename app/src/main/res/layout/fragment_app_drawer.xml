@@ -44,7 +44,7 @@
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:src="@android:drawable/ic_menu_search"
-            android:tint="#80FFFFFF"
+            app:tint="#80FFFFFF"
             android:contentDescription="No results found" />
 
         <TextView

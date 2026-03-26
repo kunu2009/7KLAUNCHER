@@ -9,12 +9,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * Helper class to integrate icon pack functionality with existing app adapters
+ * Enhanced helper class to integrate icon pack functionality with existing app adapters
+ * Supports multiple icon pack formats and provides caching for performance
  */
 class IconPackHelper(private val context: Context) {
     
     private val iconPackManager = IconPackManager(context)
     private val prefs = context.getSharedPreferences("launcher_prefs", Context.MODE_PRIVATE)
+    
+    // Cache for processed icons
+    private val iconCache = mutableMapOf<String, Drawable>()
     
     init {
         // Load saved icon pack on initialization
@@ -30,6 +34,11 @@ class IconPackHelper(private val context: Context) {
      * Get icon for app, applying current icon pack if available
      */
     fun getAppIcon(packageName: String, className: String?, defaultIcon: Drawable): Drawable {
+        val cacheKey = "$packageName|$className"
+        
+        // Return cached icon if available
+        iconCache[cacheKey]?.let { return it }
+        
         val componentName = if (className != null) {
             ComponentName(packageName, className)
         } else {
@@ -37,7 +46,13 @@ class IconPackHelper(private val context: Context) {
             ComponentName(packageName, "$packageName.MainActivity")
         }
         
-        return iconPackManager.getIconForComponent(componentName) ?: defaultIcon
+        val iconPackIcon = iconPackManager.getIconForComponent(componentName)
+        val resultIcon = iconPackIcon ?: defaultIcon
+        
+        // Cache the result
+        iconCache[cacheKey] = resultIcon
+        
+        return resultIcon
     }
     
     /**

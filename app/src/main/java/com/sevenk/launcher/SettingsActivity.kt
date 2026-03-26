@@ -11,7 +11,6 @@ import android.widget.Button
 import android.widget.CompoundButton
 import android.widget.SeekBar
 import android.widget.Spinner
-import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,6 +20,7 @@ import com.sevenk.launcher.backup.SimpleBackupManager
 import com.sevenk.launcher.backup.BackupManagerContract
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.Locale
 import kotlin.math.ln
 import kotlin.math.pow
 
@@ -46,12 +46,12 @@ class SettingsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
 
-        val swShowDock = findViewById<Switch>(R.id.swShowDock)
-        val swShowSidebar = findViewById<Switch>(R.id.swShowSidebar)
-        val swShowLabels = findViewById<Switch>(R.id.swShowLabels)
-        val swHideSearch = findViewById<Switch>(R.id.swHideSearch)
-        val swSwipeClose = findViewById<Switch>(R.id.swSwipeClose)
-        val swPowerSaver = findViewById<Switch>(R.id.swPowerSaver)
+        val swShowDock = findViewById<CompoundButton>(R.id.swShowDock)
+        val swShowSidebar = findViewById<CompoundButton>(R.id.swShowSidebar)
+        val swShowLabels = findViewById<CompoundButton>(R.id.swShowLabels)
+        val swHideSearch = findViewById<CompoundButton>(R.id.swHideSearch)
+        val swSwipeClose = findViewById<CompoundButton>(R.id.swSwipeClose)
+        val swPowerSaver = findViewById<CompoundButton>(R.id.swPowerSaver)
         val tvColumns = findViewById<TextView>(R.id.tvColumnsValue)
         val sbColumns = findViewById<SeekBar>(R.id.sbColumns)
         val tvIconSize = findViewById<TextView>(R.id.tvIconSizeValue)
@@ -73,7 +73,7 @@ class SettingsActivity : AppCompatActivity() {
         val tvFolderCols = findViewById<TextView>(R.id.tvFolderColumnsValue)
         val sbFolderCols = findViewById<SeekBar>(R.id.sbFolderColumns)
         // Clock toggle
-        val swShowClock = findViewById<Switch>(R.id.swShowClock)
+        val swShowClock = findViewById<CompoundButton>(R.id.swShowClock)
         val btnDone = findViewById<Button>(R.id.btnDone)
         val btnManageDock = findViewById<Button>(R.id.btnManageDockApps)
         val btnManageSidebar = findViewById<Button>(R.id.btnManageSidebarApps)
@@ -85,19 +85,19 @@ class SettingsActivity : AppCompatActivity() {
         val btnClearWebData = findViewById<Button>(R.id.btnClearWebData)
         val btnClearTemp = findViewById<Button>(R.id.btnClearTemp)
         // New settings controls
-        val swDynamicColor = findViewById<Switch>(R.id.swDynamicColor)
+        val swDynamicColor = findViewById<CompoundButton>(R.id.swDynamicColor)
         val spAccentColor = findViewById<Spinner>(R.id.spAccentColor)
         val spLabelLines = findViewById<Spinner>(R.id.spLabelLines)
         val spLabelFontSize = findViewById<Spinner>(R.id.spLabelFontSize)
         val spDrawerSortOrder = findViewById<Spinner>(R.id.spDrawerSortOrder)
-        val swDrawerAlphabetHeaders = findViewById<Switch>(R.id.swDrawerAlphabetHeaders)
+        val swDrawerAlphabetHeaders = findViewById<CompoundButton>(R.id.swDrawerAlphabetHeaders)
         val sbDockOpacity = findViewById<SeekBar>(R.id.sbDockOpacity)
         val tvDockOpacityValue = findViewById<TextView>(R.id.tvDockOpacityValue)
-        val swPageDots = findViewById<Switch>(R.id.swPageDots)
-        val swParallax = findViewById<Switch>(R.id.swParallax)
-        val swSearchApps = findViewById<Switch>(R.id.swSearchApps)
-        val swSearchContacts = findViewById<Switch>(R.id.swSearchContacts)
-        val swSearchWeb = findViewById<Switch>(R.id.swSearchWeb)
+        val swPageDots = findViewById<CompoundButton>(R.id.swPageDots)
+        val swParallax = findViewById<CompoundButton>(R.id.swParallax)
+        val swSearchApps = findViewById<CompoundButton>(R.id.swSearchApps)
+        val swSearchContacts = findViewById<CompoundButton>(R.id.swSearchContacts)
+        val swSearchWeb = findViewById<CompoundButton>(R.id.swSearchWeb)
         val btnManageHiddenApps = findViewById<Button>(R.id.btnManageHiddenApps)
         val spAutoClearCache = findViewById<Spinner>(R.id.spAutoClearCache)
         
@@ -107,6 +107,7 @@ class SettingsActivity : AppCompatActivity() {
         val btnPrivacy = findViewById<Button>(R.id.btnPrivacy)
         val btnBackup = findViewById<Button>(R.id.btnBackup)
         val btnRestore = findViewById<Button>(R.id.btnRestore)
+        val btnSystemMonitor = findViewById<Button>(R.id.btnSystemMonitor)
 
         // Load
         swShowDock.isChecked = prefs.getBoolean("show_dock", true)
@@ -117,7 +118,6 @@ class SettingsActivity : AppCompatActivity() {
         swPowerSaver.isChecked = prefs.getBoolean("launcher_power_saver", false)
         // Theme & labels
         swDynamicColor.isChecked = prefs.getBoolean("dynamic_color", true)
-        val accentNames = resources.getStringArray(R.array.accent_color_names)
         val accentValues = resources.getStringArray(R.array.accent_color_values)
         val savedAccent = prefs.getString("accent_color", "SYSTEM") ?: "SYSTEM"
         val accentIndex = accentValues.indexOfFirst { it == savedAccent }.let { if (it < 0) 0 else it }
@@ -415,13 +415,17 @@ class SettingsActivity : AppCompatActivity() {
         btnRestore.setOnClickListener {
             performRestore()
         }
+        
+        btnSystemMonitor.setOnClickListener {
+            startActivity(Intent(this, SystemMonitorActivity::class.java))
+        }
 
         // Wallpaper actions
         btnWallpaperGallery.setOnClickListener {
             pickWallpaperLauncher.launch("image/*")
         }
         btnWallpaperPreloaded.setOnClickListener {
-            Toast.makeText(this, getString(R.string.no_preloaded_wallpapers), Toast.LENGTH_SHORT).show()
+            showWallpaperStorePicker()
         }
 
         // Storage summary and actions
@@ -525,9 +529,6 @@ class SettingsActivity : AppCompatActivity() {
                         is BackupManagerContract.BackupRestoreResult.Error -> {
                             Toast.makeText(this@SettingsActivity, "Failed to restore backup: ${result.message}", Toast.LENGTH_SHORT).show()
                         }
-                        else -> {
-                            Toast.makeText(this@SettingsActivity, "Unknown result from backup restore", Toast.LENGTH_SHORT).show()
-                        }
                     }
                 }
             } catch (e: Exception) {
@@ -543,8 +544,64 @@ class SettingsActivity : AppCompatActivity() {
             contentResolver.openInputStream(uri)?.use { stream ->
                 wm.setStream(stream)
             }
+            prefs.edit()
+                .remove("preloaded_wallpaper_asset")
+                .remove("custom_bg_uri")
+                .apply()
             Toast.makeText(this, getString(R.string.wallpaper_applied), Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
+            Toast.makeText(this, getString(R.string.error_applying_wallpaper), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun showWallpaperStorePicker() {
+        val assetsList = try {
+            assets.list("")
+                ?.filter { name ->
+                    val lower = name.lowercase(Locale.ROOT)
+                    lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png") || lower.endsWith(".webp")
+                }
+                ?.sortedWith(compareBy<String> { fileName ->
+                    fileName.substringBefore('.').toIntOrNull() ?: Int.MAX_VALUE
+                }.thenBy { it })
+                .orEmpty()
+        } catch (_: Throwable) {
+            emptyList()
+        }
+
+        if (assetsList.isEmpty()) {
+            Toast.makeText(this, getString(R.string.no_preloaded_wallpapers), Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val labels = assetsList.map { fileName ->
+            if (fileName.equals("7.jpeg", ignoreCase = true)) "$fileName (default)" else fileName
+        }.toTypedArray()
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(getString(R.string.choose_preloaded))
+            .setItems(labels) { dialog, which ->
+                val selected = assetsList[which]
+                applyWallpaperFromAsset(selected)
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun applyWallpaperFromAsset(assetName: String) {
+        try {
+            val wm = WallpaperManager.getInstance(this)
+            assets.open(assetName).use { stream ->
+                wm.setStream(stream)
+            }
+            prefs.edit()
+                .putString("preloaded_wallpaper_asset", assetName)
+                .remove("custom_bg_uri")
+                .putBoolean("default_wallpaper_initialized", true)
+                .apply()
+            Toast.makeText(this, getString(R.string.wallpaper_applied), Toast.LENGTH_SHORT).show()
+        } catch (_: Throwable) {
             Toast.makeText(this, getString(R.string.error_applying_wallpaper), Toast.LENGTH_SHORT).show()
         }
     }
@@ -589,7 +646,7 @@ class SettingsActivity : AppCompatActivity() {
         val exp = (ln(bytes.toDouble()) / ln(unit)).toInt().coerceAtMost(4)
         return if (exp == 0) "$bytes B" else {
             val pre = "KMGTPE"[exp - 1]
-            String.format("%.2f %sB", bytes / unit.pow(exp.toDouble()), pre)
+            String.format(Locale.getDefault(), "%.2f %sB", bytes / unit.pow(exp.toDouble()), pre)
         }
     }
 

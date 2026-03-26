@@ -27,44 +27,44 @@
             android:paddingTop="8dp"
             android:paddingBottom="8dp" />
 
-        <Switch
+        <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/swShowDock"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Show Dock" />
 
-        <Switch
+        <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/swShowSidebar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Show Sidebar" />
 
-        <Switch
+        <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/swShowLabels"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Show Labels" />
 
-        <Switch
+        <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/swHideSearch"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Hide Search Box in Drawer" />
 
-        <Switch
+        <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/swSwipeClose"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Enable Swipe-to-Close Drawer" />
 
-        <Switch
+        <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/swPowerSaver"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Launcher Power Saver" />
 
         <!-- General: Theme & Labels -->
-        <Switch
+        <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/swDynamicColor"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -147,7 +147,7 @@
             android:layout_height="wrap_content"
             android:entries="@array/drawer_sort_order_entries" />
 
-        <Switch
+        <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/swDrawerAlphabetHeaders"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -394,19 +394,19 @@
         </LinearLayout>
 
         <!-- Clock toggle -->
-        <Switch
+        <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/swShowClock"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Show Clock on Home" />
 
-        <Switch
+        <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/swPageDots"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/page_indicator_dots" />
 
-        <Switch
+        <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/swParallax"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -473,17 +473,17 @@
             android:layout_height="wrap_content"
             android:text="@string/search_sources"
             android:paddingTop="12dp" />
-        <Switch
+        <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/swSearchApps"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/search_apps" />
-        <Switch
+        <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/swSearchContacts"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/search_contacts" />
-        <Switch
+        <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/swSearchWeb"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -583,6 +583,13 @@
                 android:text="@string/clear_temp_files"
                 android:layout_marginStart="4dp" />
         </LinearLayout>
+
+        <Button
+            android:id="@+id/btnSystemMonitor"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="System Monitor"
+            android:layout_marginTop="8dp" />
 
         <Button
             android:id="@+id/btnDone"

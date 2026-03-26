@@ -603,13 +603,17 @@ class GestureManager(private val context: Context) {
                             context.startActivity(panelIntent)
                         } else {
                             // Attempt to toggle via BluetoothAdapter
-                            val bluetoothAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
-                            if (bluetoothAdapter != null) {
-                                if (bluetoothAdapter.isEnabled) {
-                                    bluetoothAdapter.disable()
-                                } else {
-                                    bluetoothAdapter.enable()
+                            try {
+                                val bluetoothAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
+                                if (bluetoothAdapter != null) {
+                                    if (bluetoothAdapter.isEnabled) {
+                                        bluetoothAdapter.disable()
+                                    } else {
+                                        bluetoothAdapter.enable()
+                                    }
                                 }
+                            } catch (se: SecurityException) {
+                                // Missing permission, do nothing to avoid crash
                             }
                         }
                         true

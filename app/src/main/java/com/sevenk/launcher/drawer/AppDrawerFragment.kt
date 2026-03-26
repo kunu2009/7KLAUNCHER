@@ -1,6 +1,7 @@
 package com.sevenk.launcher.drawer
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -8,7 +9,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
-import android.content.SharedPreferences
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -84,9 +84,16 @@ class AppDrawerFragment : Fragment() {
         categoryTabs = view.findViewById(R.id.appCategoriesTabs)
         searchBarContainer = view.findViewById(R.id.searchBarContainer)
 
-        // Set up the grid layout
+        // Set up the grid layout with optimizations
         val columnCount = resources.getInteger(R.integer.app_drawer_columns)
-        recyclerView.layoutManager = GridLayoutManager(context, columnCount)
+        val glm = GridLayoutManager(context, columnCount)
+        recyclerView.layoutManager = glm
+        recyclerView.setHasFixedSize(true)
+        recyclerView.setItemViewCacheSize(80)  // Keep 80 views in cache
+        recyclerView.isDrawingCacheEnabled = true
+        
+        // Disable item animations for faster rendering
+        (recyclerView.itemAnimator as? androidx.recyclerview.widget.SimpleItemAnimator)?.supportsChangeAnimations = false
 
         // Set up the adapter with initial preferences
         adapter = AppDrawerAdapter(
@@ -183,6 +190,9 @@ class AppDrawerFragment : Fragment() {
         // Set up clear button
         clearSearchButton.setOnClickListener {
             searchEditText.setText("")
+            
+            // Clear the search from adapter
+            adapter.clearSearch()
 
             // Hide keyboard
             hideKeyboard()
@@ -208,6 +218,7 @@ class AppDrawerFragment : Fragment() {
                 // Clear search when changing category
                 if (!searchEditText.text.isNullOrEmpty()) {
                     searchEditText.setText("")
+                    adapter.clearSearch()
                 }
 
                 // Check if we need to show empty state

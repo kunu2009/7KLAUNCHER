@@ -9,6 +9,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.cardview.widget.CardView
+import androidx.appcompat.content.res.AppCompatResources
 import com.sevenk.launcher.haptics.HapticFeedbackManager
 
 /**
@@ -183,7 +184,7 @@ class OnboardingManager(private val context: Context) {
             textSize = 16f
             setTextColor(Color.parseColor("#666666"))
             setPadding(16, 12, 16, 12)
-            background = context.getDrawable(android.R.drawable.list_selector_background)
+            background = AppCompatResources.getDrawable(context, android.R.drawable.list_selector_background)
             setOnClickListener {
                 hapticManager.performHaptic(HapticFeedbackManager.HapticType.LIGHT_TAP)
                 onAction(false)
@@ -196,7 +197,7 @@ class OnboardingManager(private val context: Context) {
             setTextColor(Color.parseColor("#1976D2"))
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             setPadding(16, 12, 16, 12)
-            background = context.getDrawable(android.R.drawable.list_selector_background)
+            background = AppCompatResources.getDrawable(context, android.R.drawable.list_selector_background)
             setOnClickListener {
                 hapticManager.performHaptic(HapticFeedbackManager.HapticType.LIGHT_TAP)
                 onAction(true)

@@ -11,6 +11,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.sevenk.launcher.privacy.AppPrivacyManager
+import java.util.Locale
 
 class AppPrivacyActivity : AppCompatActivity() {
     
@@ -108,8 +109,13 @@ class AppPrivacyAdapter(
             appName.text = app.appName
             
             val levels = AppPrivacyManager.PrivacyLevel.values()
-            val adapter = android.widget.ArrayAdapter(itemView.context, android.R.layout.simple_spinner_item, 
-                levels.map { it.name.replace("_", " ").lowercase().split(" ").joinToString(" ") { word -> word.capitalize() } })
+            val adapter = android.widget.ArrayAdapter(itemView.context, android.R.layout.simple_spinner_item,
+                levels.map {
+                    it.name.replace("_", " ")
+                        .lowercase(Locale.getDefault())
+                        .split(" ")
+                        .joinToString(" ") { word -> word.replaceFirstChar { c -> c.titlecase(Locale.getDefault()) } }
+                })
             adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
             privacySpinner.adapter = adapter
             

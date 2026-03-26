@@ -458,7 +458,7 @@ class BrowserActivity : AppCompatActivity() {
     }
     
     private fun showBottomSheetMenu() {
-        val menuView = layoutInflater.inflate(R.layout.bottom_sheet_menu, null)
+        val menuView = layoutInflater.inflate(R.layout.bottom_sheet_menu, binding.root as ViewGroup, false)
         
         val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(this)
         dialog.setContentView(menuView)

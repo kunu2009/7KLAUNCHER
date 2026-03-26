@@ -1,0 +1,7 @@
+task cleanBuildDirs(type: Delete) {
+    delete fileTree(dir: projectDir, includes: ['**/build'])
+    delete fileTree(dir: projectDir, includes: ['**/.gradle'])
+    delete fileTree(dir: projectDir, includes: ['**/generated'])
+    delete fileTree(dir: projectDir, includes: ['**/kapt3'])
+}
+

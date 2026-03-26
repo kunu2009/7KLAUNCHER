@@ -120,9 +120,21 @@ class VaultActivity : AppCompatActivity() {
                 }
             }
             if (uris.isNotEmpty()) {
-                val flags = (data?.flags ?: 0) and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                for (u in uris) {
-                    try { contentResolver.takePersistableUriPermission(u, flags) } catch (_: Throwable) {}
+                val intentFlags = data?.flags ?: 0
+                var takeFlags = 0
+                if ((intentFlags and Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0) {
+                    takeFlags = takeFlags or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                }
+                if ((intentFlags and Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != 0) {
+                    takeFlags = takeFlags or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                }
+
+                if (takeFlags != 0) {
+                    for (u in uris) {
+                        try {
+                            contentResolver.takePersistableUriPermission(u, takeFlags)
+                        } catch (_: Throwable) {}
+                    }
                 }
                 importAndEncrypt(uris)
                 promptDeleteOriginals(uris)

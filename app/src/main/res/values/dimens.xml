@@ -32,4 +32,14 @@
     <!-- Sidebar specific paddings -->
     <dimen name="sidebar_padding_top">24dp</dimen>
     <dimen name="sidebar_padding_bottom">100dp</dimen>
+
+    <!-- Studio responsive tokens -->
+    <dimen name="studio_page_padding">12dp</dimen>
+    <dimen name="studio_title_size">28sp</dimen>
+    <dimen name="studio_subtitle_size">12sp</dimen>
+    <dimen name="studio_section_title_size">20sp</dimen>
+    <dimen name="studio_body_size">13sp</dimen>
+    <dimen name="studio_button_min_height">48dp</dimen>
+    <dimen name="studio_button_min_width">72dp</dimen>
+    <dimen name="studio_label_width">82dp</dimen>
 </resources>

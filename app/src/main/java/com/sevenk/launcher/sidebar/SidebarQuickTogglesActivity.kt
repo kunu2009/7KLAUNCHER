@@ -3,7 +3,7 @@ package com.sevenk.launcher.sidebar
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.widget.Switch
+import android.widget.CompoundButton
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -19,9 +19,9 @@ import kotlinx.coroutines.launch
 class SidebarQuickTogglesActivity : AppCompatActivity() {
     
     private lateinit var quickToggleManager: QuickToggleManager
-    private lateinit var wifiSwitch: Switch
-    private lateinit var bluetoothSwitch: Switch
-    private lateinit var flashlightSwitch: Switch
+    private lateinit var wifiSwitch: CompoundButton
+    private lateinit var bluetoothSwitch: CompoundButton
+    private lateinit var flashlightSwitch: CompoundButton
     
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -60,7 +60,7 @@ class SidebarQuickTogglesActivity : AppCompatActivity() {
     private fun setupToggleListeners() {
         wifiSwitch.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked != quickToggleManager.isWifiEnabled()) {
-                val newState = quickToggleManager.toggleWifi()
+                quickToggleManager.toggleWifi()
                 // Update switch to reflect actual state
                 lifecycleScope.launch {
                     delay(500) // Give time for state change
@@ -71,7 +71,7 @@ class SidebarQuickTogglesActivity : AppCompatActivity() {
         
         bluetoothSwitch.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked != quickToggleManager.isBluetoothEnabled()) {
-                val newState = quickToggleManager.toggleBluetooth()
+                quickToggleManager.toggleBluetooth()
                 // Update switch to reflect actual state
                 lifecycleScope.launch {
                     delay(500) // Give time for state change

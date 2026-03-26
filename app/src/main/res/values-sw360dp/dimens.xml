@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="studio_page_padding">10dp</dimen>
+    <dimen name="studio_title_size">22sp</dimen>
+    <dimen name="studio_subtitle_size">11sp</dimen>
+    <dimen name="studio_section_title_size">16sp</dimen>
+    <dimen name="studio_body_size">12sp</dimen>
+    <dimen name="studio_button_min_height">46dp</dimen>
+    <dimen name="studio_button_min_width">64dp</dimen>
+    <dimen name="studio_label_width">68dp</dimen>
+</resources>

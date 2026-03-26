@@ -22,6 +22,9 @@ import androidx.core.content.ContextCompat
 import com.sevenk.launcher.util.Perf
 import android.view.HapticFeedbackConstants
 import androidx.recyclerview.widget.DefaultItemAnimator
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class StanHomeFragment : Fragment() {
 
@@ -180,15 +183,19 @@ class StanHomeFragment : Fragment() {
                 val names = pkgs.mapNotNull { p -> act.getAppList().find { it.packageName == p }?.name }
                 addBot("Recent: ${names.joinToString()}"); return
             }
-            "date" -> { addBot(java.text.SimpleDateFormat("EEE, MMM d, yyyy").format(java.util.Date())); return }
-            "time" -> { addBot(java.text.SimpleDateFormat("h:mm a").format(java.util.Date())); return }
+            "date" -> { addBot(SimpleDateFormat("EEE, MMM d, yyyy", Locale.getDefault()).format(Date())); return }
+            "time" -> { addBot(SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date())); return }
             "news" -> { openUrl("https://news.google.com"); addBot("Opening News…"); return }
         }
         // System toggles (limited: open settings panels as needed)
         when (lower) {
             "wifi on", "wifi off" -> {
                 // Open Wi-Fi settings panel (no direct toggle without permissions)
-                try { startActivity(android.content.Intent(android.provider.Settings.Panel.ACTION_WIFI)) } catch (_: Throwable) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    try { startActivity(android.content.Intent(android.provider.Settings.Panel.ACTION_WIFI)) } catch (_: Throwable) {
+                        try { startActivity(android.content.Intent(android.provider.Settings.ACTION_WIFI_SETTINGS)) } catch (_: Throwable) {}
+                    }
+                } else {
                     try { startActivity(android.content.Intent(android.provider.Settings.ACTION_WIFI_SETTINGS)) } catch (_: Throwable) {}
                 }
                 addBot("Opening Wi‑Fi settings…"); return

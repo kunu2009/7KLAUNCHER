@@ -425,6 +425,146 @@ class IconPackManager(private val context: Context) {
     }
 
     /**
+     * Get currently selected icon pack package name
+     */
+    fun getCurrentIconPackName(): String {
+        return context.getSharedPreferences("icon_pack_prefs", Context.MODE_PRIVATE)
+            .getString("selected_icon_pack", "") ?: ""
+    }
+
+    /**
+     * Save selected icon pack
+     */
+    fun saveSelectedIconPack(packageName: String) {
+        context.getSharedPreferences("icon_pack_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putString("selected_icon_pack", packageName)
+            .apply()
+    }
+
+    /**
+     * Get icon pack preview icons for the selection UI
+     */
+    suspend fun getIconPackPreview(packageName: String): List<Drawable> = withContext(Dispatchers.IO) {
+        val previewIcons = mutableListOf<Drawable>()
+        
+        if (packageName.isEmpty()) {
+            // Return system icons for preview
+            return@withContext emptyList()
+        }
+
+        try {
+            val resources = context.packageManager.getResourcesForApplication(packageName)
+            
+            // Get some preview icons from the icon pack
+            val commonApps = listOf(
+                "com.android.chrome", "com.whatsapp", "com.instagram.android",
+                "com.spotify.music", "com.twitter.android", "com.facebook.katana"
+            )
+            
+            commonApps.forEach { appPkg ->
+                // Look for mapped icons for common apps
+                val component = ComponentName(appPkg, "$appPkg.MainActivity")
+                val icon = getIconForComponent(component)
+                if (icon != null) {
+                    previewIcons.add(icon)
+                }
+                if (previewIcons.size >= 4) return@forEach
+            }
+            
+        } catch (e: Exception) {
+            // Return empty list if can't get previews
+        }
+        
+        previewIcons
+    }
+
+    /**
+     * Check if an icon pack supports adaptive icons
+     */
+    fun supportsAdaptiveIcons(packageName: String): Boolean {
+        return try {
+            val resources = context.packageManager.getResourcesForApplication(packageName)
+            
+            // Check if the icon pack has adaptive icon resources
+            val hasAdaptive = resources.getIdentifier("adaptive_icon_config", "xml", packageName) != 0 ||
+                             resources.getIdentifier("icon_shape", "string", packageName) != 0
+            
+            hasAdaptive
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Get icon count for an icon pack
+     */
+    suspend fun getIconPackIconCount(packageName: String): Int = withContext(Dispatchers.IO) {
+        if (packageName.isEmpty()) return@withContext 0
+        
+        try {
+            // Load the icon pack temporarily to count icons
+            val tempMap = HashMap<String, String>()
+            val resources = context.packageManager.getResourcesForApplication(packageName)
+            
+            // Load appfilter to count mapped icons
+            val appFilterResourceIds = listOf(
+                resources.getIdentifier("appfilter", "xml", packageName),
+                resources.getIdentifier("appfilter", "raw", packageName),
+                resources.getIdentifier("drawable", "xml", packageName),
+                resources.getIdentifier("app_filter", "xml", packageName)
+            ).filter { it != 0 }
+
+            for (resourceId in appFilterResourceIds) {
+                try {
+                    val parser = resources.getXml(resourceId)
+                    var eventType = parser.eventType
+                    
+                    while (eventType != XmlPullParser.END_DOCUMENT) {
+                        if (eventType == XmlPullParser.START_TAG && parser.name == "item") {
+                            var component: String? = null
+                            var drawable: String? = null
+
+                            for (i in 0 until parser.attributeCount) {
+                                when (parser.getAttributeName(i)) {
+                                    "component" -> component = parser.getAttributeValue(i)
+                                    "drawable" -> drawable = parser.getAttributeValue(i)
+                                }
+                            }
+
+                            if (component != null && drawable != null) {
+                                tempMap[component] = drawable
+                            }
+                        }
+                        eventType = parser.next()
+                    }
+                    
+                    // If we successfully loaded, return the count
+                    return@withContext tempMap.size
+                } catch (e: Exception) {
+                    continue
+                }
+            }
+            
+            return@withContext 0
+        } catch (e: Exception) {
+            return@withContext 0
+        }
+    }
+
+    /**
+     * Generate themed icon from app icon using icon pack styling
+     */
+    suspend fun generateThemedIcon(appIcon: Drawable): Drawable = withContext(Dispatchers.IO) {
+        // Apply current icon pack theming to any app icon
+        if (currentIconPack != null) {
+            applyIconPackMask(appIcon) ?: appIcon
+        } else {
+            appIcon
+        }
+    }
+
+    /**
      * Clears all icon pack caches
      */
     fun clearCache() {
@@ -440,11 +580,16 @@ class IconPackManager(private val context: Context) {
     }
 
     /**
-     * Data class representing an icon pack
+     * Data class representing an icon pack with enhanced metadata
      */
     data class IconPack(
         val packageName: String,
         val name: String,
-        val previewDrawable: Drawable?
+        val previewDrawable: Drawable?,
+        val version: String = "",
+        val iconCount: Int = 0,
+        val supportsAdaptiveIcons: Boolean = false,
+        val author: String = "",
+        val description: String = ""
     )
 }

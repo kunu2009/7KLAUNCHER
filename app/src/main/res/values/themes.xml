@@ -22,14 +22,14 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowTranslucentNavigation">true</item>
         <!-- Light theme: dark icons on navigation bar -->
-        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
         
         <!-- Window settings -->
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowContentOverlay">@null</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
-        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="27">shortEdges</item>
         
         <!-- Text appearance (adaptive via tokens) -->
         <item name="android:textColor">@color/sevenk_text_primary</item>
@@ -133,22 +133,11 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
         
-        <!-- Secondary brand color -->
-        <item name="colorSecondary">@color/sevenk_secondary</item>
-        <item name="colorOnSecondary">@color/white</item>
-        <item name="colorSecondaryContainer">@color/sevenk_secondary_light</item>
-        <item name="colorOnSecondaryContainer">@color/black</item>
         
-        <!-- Status bar -->
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowTranslucentStatus">true</item>
         
-        <!-- Navigation bar -->
-        <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowTranslucentNavigation">true</item>
+        
         
         <!-- Window settings -->
         <item name="android:windowBackground">@color/sevenk_bg</item>

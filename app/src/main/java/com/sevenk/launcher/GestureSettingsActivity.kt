@@ -11,6 +11,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.sevenk.launcher.gesture.GestureManager
+import java.util.Locale
 
 class GestureSettingsActivity : AppCompatActivity() {
     
@@ -83,12 +84,17 @@ class GestureAdapter(
             config: GestureManager.GestureConfig,
             onConfigChanged: (GestureManager.GestureConfig) -> Unit
         ) {
-            gestureNameView.text = config.type.name.replace("_", " ").lowercase()
-                .split(" ").joinToString(" ") { it.capitalize() }
+            gestureNameView.text = config.type.name.replace("_", " ").lowercase(Locale.getDefault())
+                .split(" ").joinToString(" ") { it.replaceFirstChar { c -> c.titlecase(Locale.getDefault()) } }
             
             val actions = GestureManager.GestureAction.values()
-            val adapter = ArrayAdapter(itemView.context, android.R.layout.simple_spinner_item, 
-                actions.map { it.name.replace("_", " ").lowercase().split(" ").joinToString(" ") { word -> word.capitalize() } })
+            val adapter = ArrayAdapter(itemView.context, android.R.layout.simple_spinner_item,
+                actions.map {
+                    it.name.replace("_", " ")
+                        .lowercase(Locale.getDefault())
+                        .split(" ")
+                        .joinToString(" ") { word -> word.replaceFirstChar { c -> c.titlecase(Locale.getDefault()) } }
+                })
             adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
             actionSpinner.adapter = adapter
             

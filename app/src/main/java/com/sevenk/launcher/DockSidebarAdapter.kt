@@ -60,7 +60,10 @@ class DockSidebarAdapter(
         holder.icon.setImageBitmap(bmp)
         holder.name.text = app.name
         holder.name.visibility = if (showLabels) View.VISIBLE else View.GONE
-        holder.itemView.setOnClickListener { onClick(app) }
+        holder.itemView.setOnClickListener {
+            try { holder.itemView.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY) } catch (_: Throwable) {}
+            onClick(app)
+        }
         // Long-press-then-drag vs long-press-without-move
         val vc = android.view.ViewConfiguration.get(holder.itemView.context)
         val touchSlop = vc.scaledTouchSlop
@@ -77,6 +80,9 @@ class DockSidebarAdapter(
         holder.itemView.setOnTouchListener { v, ev ->
             gd.onTouchEvent(ev)
             when (ev.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    v.animate().scaleX(0.96f).scaleY(0.96f).alpha(0.9f).setDuration(90).start()
+                }
                 android.view.MotionEvent.ACTION_MOVE -> {
                     if (longPressed && !startedDrag) {
                         val dx = ev.x - downX; val dy = ev.y - downY
@@ -91,6 +97,7 @@ class DockSidebarAdapter(
                     }
                 }
                 android.view.MotionEvent.ACTION_UP -> {
+                    v.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(110).start()
                     if (longPressed && !startedDrag) {
                         onLongPress?.invoke(app)
                         longPressed = false
@@ -99,6 +106,7 @@ class DockSidebarAdapter(
                     longPressed = false; startedDrag = false
                 }
                 android.view.MotionEvent.ACTION_CANCEL -> {
+                    v.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(110).start()
                     longPressed = false; startedDrag = false
                 }
             }

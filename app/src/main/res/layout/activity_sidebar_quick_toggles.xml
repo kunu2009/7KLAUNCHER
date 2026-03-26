@@ -34,7 +34,7 @@
             android:text="Wi-Fi"
             android:textSize="16sp" />
 
-        <Switch
+        <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/wifiSwitch"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content" />
@@ -61,7 +61,7 @@
             android:text="Bluetooth"
             android:textSize="16sp" />
 
-        <Switch
+        <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/bluetoothSwitch"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content" />
@@ -88,7 +88,7 @@
             android:text="Flashlight"
             android:textSize="16sp" />
 
-        <Switch
+        <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/flashlightSwitch"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content" />

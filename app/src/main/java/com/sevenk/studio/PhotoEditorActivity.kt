@@ -21,6 +21,8 @@ import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.view.MotionEvent
+import android.widget.Button
 import java.io.InputStream
 import java.io.OutputStream
 
@@ -33,8 +35,20 @@ class PhotoEditorActivity : AppCompatActivity() {
     private var contrastProgress: Int = 100 // 0..200, default 100
     private var saturationProgress: Int = 100 // 0..200, default 100
     private var currentFilter: Filter = Filter.NONE
+    private val undoStack = ArrayDeque<EditorState>()
+    private val redoStack = ArrayDeque<EditorState>()
+    private val maxHistory = 16
+    private var suppressHistory = false
 
     private enum class Filter { NONE, WARM, COOL, BW, VIVID }
+
+    private data class EditorState(
+        val bitmap: Bitmap?,
+        val brightness: Int,
+        val contrast: Int,
+        val saturation: Int,
+        val filter: Filter
+    )
 
     private val imagePickerLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
@@ -42,8 +56,11 @@ class PhotoEditorActivity : AppCompatActivity() {
                 currentImageUri = it
                 loadBitmapFromUri(it)?.let { bmp ->
                     currentBitmap = bmp
+                    undoStack.clear()
+                    redoStack.clear()
                     resetAdjustments()
                     renderPreview()
+                    updateHistoryButtons()
                 } ?: run {
                     binding.previewImage.setImageURI(it)
                 }
@@ -56,9 +73,11 @@ class PhotoEditorActivity : AppCompatActivity() {
             result.data?.let { UCrop.getOutput(it) }?.let {
                 currentImageUri = it
                 loadBitmapFromUri(it)?.let { bmp ->
+                    pushUndoState()
                     currentBitmap = bmp
                     resetAdjustments()
                     renderPreview()
+                    updateHistoryButtons()
                 } ?: run {
                     binding.previewImage.setImageURI(it)
                 }
@@ -89,10 +108,85 @@ class PhotoEditorActivity : AppCompatActivity() {
         flipHBtn?.setOnClickListener { flipImage(horizontal = true) }
         val flipVBtn: android.view.View? = try { binding.root.findViewById(R.id.btnFlipV) } catch (_: Throwable) { null }
         flipVBtn?.setOnClickListener { flipImage(horizontal = false) }
+        val resetBtn: android.view.View? = try { binding.root.findViewById(R.id.btnReset) } catch (_: Throwable) { null }
+        resetBtn?.setOnClickListener {
+            pushUndoState()
+            resetAdjustments()
+            renderPreview()
+            updateHistoryButtons()
+            Toast.makeText(this, "Adjustments reset", Toast.LENGTH_SHORT).show()
+        }
+
+        val undoBtn: android.view.View? = try { binding.root.findViewById(R.id.btnUndo) } catch (_: Throwable) { null }
+        undoBtn?.setOnClickListener { undoEdit() }
+        val redoBtn: android.view.View? = try { binding.root.findViewById(R.id.btnRedo) } catch (_: Throwable) { null }
+        redoBtn?.setOnClickListener { redoEdit() }
+
+        // Hold image to compare with original
+        binding.previewImage.setOnTouchListener { _, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    currentBitmap?.let {
+                        binding.previewImage.colorFilter = null
+                        binding.previewImage.setImageBitmap(it)
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    renderPreview()
+                    true
+                }
+                else -> false
+            }
+        }
 
         // Adjustments UI
+        configureResponsiveButtonLabels()
         setupAdjustmentsUI()
         setupFilterButtons()
+        setupPresetButtons()
+        applyTemplateIfProvided()
+        updateHistoryButtons()
+    }
+
+    private fun configureResponsiveButtonLabels() {
+        val widthDp = resources.displayMetrics.widthPixels / resources.displayMetrics.density
+        val compact = widthDp < 390f
+
+        fun setBtn(id: Int, normal: String, compactText: String, desc: String) {
+            val btn = try { binding.root.findViewById<Button>(id) } catch (_: Throwable) { null } ?: return
+            btn.text = if (compact) compactText else normal
+            btn.contentDescription = desc
+            btn.textSize = if (compact) 11f else 13f
+            btn.isAllCaps = false
+        }
+
+        setBtn(R.id.btnPick, "Import", "Import", "Import photo from device")
+        setBtn(R.id.btnCrop, "Crop", "Crop", "Crop photo")
+        setBtn(R.id.btnRotate, "Rotate", "Rotate", "Rotate photo")
+        setBtn(R.id.btnFlipH, "Flip H", "FlipH", "Flip photo horizontally")
+        setBtn(R.id.btnFlipV, "Flip V", "FlipV", "Flip photo vertically")
+        setBtn(R.id.btnEdit, "Edit", "Edit", "Open crop editor")
+        setBtn(R.id.btnUndo, "Undo", "Undo", "Undo last edit")
+        setBtn(R.id.btnRedo, "Redo", "Redo", "Redo last undone edit")
+        setBtn(R.id.btnReset, "Reset", "Reset", "Reset photo adjustments")
+        setBtn(R.id.btnSave, "Save", "Save", "Save edited photo")
+    }
+
+    private fun applyTemplateIfProvided() {
+        val template = intent.getStringExtra("studio_template_name")?.trim()?.lowercase() ?: return
+        val targetButtonId = when {
+            "cinematic" in template -> R.id.btnPresetCinematic
+            "portrait" in template -> R.id.btnPresetPortrait
+            "vibrant" in template -> R.id.btnPresetVibrant
+            "night" in template -> R.id.btnPresetNight
+            else -> null
+        } ?: return
+
+        try {
+            binding.root.findViewById<Button>(targetButtonId)?.performClick()
+            Toast.makeText(this, "Template applied: ${intent.getStringExtra("studio_template_name")}", Toast.LENGTH_SHORT).show()
+        } catch (_: Throwable) {}
     }
 
     private fun pickImage() {
@@ -198,10 +292,12 @@ class PhotoEditorActivity : AppCompatActivity() {
     private fun rotateImage(degrees: Float) {
         val src = currentBitmap ?: return
         try {
+            pushUndoState()
             val m = Matrix().apply { postRotate(degrees) }
             val rotated = Bitmap.createBitmap(src, 0, 0, src.width, src.height, m, true)
             currentBitmap = rotated
             renderPreview()
+            updateHistoryButtons()
         } catch (t: Throwable) {
             Toast.makeText(this, "Rotate failed", Toast.LENGTH_SHORT).show()
         }
@@ -210,10 +306,12 @@ class PhotoEditorActivity : AppCompatActivity() {
     private fun flipImage(horizontal: Boolean) {
         val src = currentBitmap ?: return
         try {
+            pushUndoState()
             val m = Matrix().apply { postScale(if (horizontal) -1f else 1f, if (horizontal) 1f else -1f, src.width / 2f, src.height / 2f) }
             val flipped = Bitmap.createBitmap(src, 0, 0, src.width, src.height, m, true)
             currentBitmap = flipped
             renderPreview()
+            updateHistoryButtons()
         } catch (t: Throwable) {
             Toast.makeText(this, "Flip failed", Toast.LENGTH_SHORT).show()
         }
@@ -229,6 +327,7 @@ class PhotoEditorActivity : AppCompatActivity() {
         seekS?.progress = saturationProgress
         val listener = object : android.widget.SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                if (suppressHistory) return
                 when (sb?.id) {
                     R.id.seekBrightness -> brightnessProgress = progress
                     R.id.seekContrast -> contrastProgress = progress
@@ -236,8 +335,12 @@ class PhotoEditorActivity : AppCompatActivity() {
                 }
                 renderPreview()
             }
-            override fun onStartTrackingTouch(sb: android.widget.SeekBar?) {}
-            override fun onStopTrackingTouch(sb: android.widget.SeekBar?) {}
+            override fun onStartTrackingTouch(sb: android.widget.SeekBar?) {
+                if (!suppressHistory) pushUndoState()
+            }
+            override fun onStopTrackingTouch(sb: android.widget.SeekBar?) {
+                updateHistoryButtons()
+            }
         }
         seekB?.setOnSeekBarChangeListener(listener)
         seekC?.setOnSeekBarChangeListener(listener)
@@ -245,12 +348,43 @@ class PhotoEditorActivity : AppCompatActivity() {
     }
 
     private fun setupFilterButtons() {
-        fun setFilter(f: Filter) { currentFilter = f; renderPreview() }
+        fun setFilter(f: Filter) {
+            pushUndoState()
+            currentFilter = f
+            renderPreview()
+            updateHistoryButtons()
+        }
         try { binding.root.findViewById<android.view.View>(R.id.btnFilterNone)?.setOnClickListener { setFilter(Filter.NONE) } } catch (_: Throwable) {}
         try { binding.root.findViewById<android.view.View>(R.id.btnFilterWarm)?.setOnClickListener { setFilter(Filter.WARM) } } catch (_: Throwable) {}
         try { binding.root.findViewById<android.view.View>(R.id.btnFilterCool)?.setOnClickListener { setFilter(Filter.COOL) } } catch (_: Throwable) {}
         try { binding.root.findViewById<android.view.View>(R.id.btnFilterBW)?.setOnClickListener { setFilter(Filter.BW) } } catch (_: Throwable) {}
         try { binding.root.findViewById<android.view.View>(R.id.btnFilterVivid)?.setOnClickListener { setFilter(Filter.VIVID) } } catch (_: Throwable) {}
+    }
+
+    private fun setupPresetButtons() {
+        fun applyPreset(b: Int, c: Int, s: Int, f: Filter, label: String) {
+            pushUndoState()
+            brightnessProgress = b.coerceIn(0, 200)
+            contrastProgress = c.coerceIn(0, 200)
+            saturationProgress = s.coerceIn(0, 200)
+            currentFilter = f
+            val seekB: android.widget.SeekBar? = try { binding.root.findViewById(R.id.seekBrightness) } catch (_: Throwable) { null }
+            val seekC: android.widget.SeekBar? = try { binding.root.findViewById(R.id.seekContrast) } catch (_: Throwable) { null }
+            val seekS: android.widget.SeekBar? = try { binding.root.findViewById(R.id.seekSaturation) } catch (_: Throwable) { null }
+            suppressHistory = true
+            seekB?.progress = brightnessProgress
+            seekC?.progress = contrastProgress
+            seekS?.progress = saturationProgress
+            suppressHistory = false
+            renderPreview()
+            updateHistoryButtons()
+            Toast.makeText(this, "$label preset applied", Toast.LENGTH_SHORT).show()
+        }
+
+        try { binding.root.findViewById<android.view.View>(R.id.btnPresetCinematic)?.setOnClickListener { applyPreset(90, 125, 115, Filter.COOL, "Cinematic") } } catch (_: Throwable) {}
+        try { binding.root.findViewById<android.view.View>(R.id.btnPresetPortrait)?.setOnClickListener { applyPreset(108, 110, 102, Filter.WARM, "Portrait") } } catch (_: Throwable) {}
+        try { binding.root.findViewById<android.view.View>(R.id.btnPresetVibrant)?.setOnClickListener { applyPreset(112, 125, 140, Filter.VIVID, "Vibrant") } } catch (_: Throwable) {}
+        try { binding.root.findViewById<android.view.View>(R.id.btnPresetNight)?.setOnClickListener { applyPreset(82, 112, 92, Filter.BW, "Night") } } catch (_: Throwable) {}
     }
 
     private fun resetAdjustments() {
@@ -261,9 +395,11 @@ class PhotoEditorActivity : AppCompatActivity() {
         val seekB: android.widget.SeekBar? = try { binding.root.findViewById(R.id.seekBrightness) } catch (_: Throwable) { null }
         val seekC: android.widget.SeekBar? = try { binding.root.findViewById(R.id.seekContrast) } catch (_: Throwable) { null }
         val seekS: android.widget.SeekBar? = try { binding.root.findViewById(R.id.seekSaturation) } catch (_: Throwable) { null }
+        suppressHistory = true
         seekB?.progress = brightnessProgress
         seekC?.progress = contrastProgress
         seekS?.progress = saturationProgress
+        suppressHistory = false
     }
 
     private fun renderPreview() {
@@ -340,12 +476,78 @@ class PhotoEditorActivity : AppCompatActivity() {
     }
 
     private fun applyMatrixToBitmap(src: Bitmap, matrix: ColorMatrix): Bitmap {
-        val out = Bitmap.createBitmap(src.width, src.height, src.config ?: Bitmap.Config.ARGB_8888)
+        val out = Bitmap.createBitmap(src.width, src.height, src.config)
         val canvas = Canvas(out)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             colorFilter = ColorMatrixColorFilter(matrix)
         }
         canvas.drawBitmap(src, 0f, 0f, paint)
         return out
+    }
+
+    private fun pushUndoState() {
+        if (suppressHistory) return
+        undoStack.addLast(snapshotState())
+        while (undoStack.size > maxHistory) undoStack.removeFirst()
+        redoStack.clear()
+    }
+
+    private fun snapshotState(): EditorState {
+        val bmpCopy = currentBitmap?.let { copyBitmap(it) }
+        return EditorState(
+            bitmap = bmpCopy,
+            brightness = brightnessProgress,
+            contrast = contrastProgress,
+            saturation = saturationProgress,
+            filter = currentFilter
+        )
+    }
+
+    private fun copyBitmap(src: Bitmap): Bitmap {
+        return src.copy(src.config, true)
+    }
+
+    private fun applyState(state: EditorState) {
+        currentBitmap = state.bitmap?.let { copyBitmap(it) }
+        brightnessProgress = state.brightness
+        contrastProgress = state.contrast
+        saturationProgress = state.saturation
+        currentFilter = state.filter
+        val seekB: android.widget.SeekBar? = try { binding.root.findViewById(R.id.seekBrightness) } catch (_: Throwable) { null }
+        val seekC: android.widget.SeekBar? = try { binding.root.findViewById(R.id.seekContrast) } catch (_: Throwable) { null }
+        val seekS: android.widget.SeekBar? = try { binding.root.findViewById(R.id.seekSaturation) } catch (_: Throwable) { null }
+        suppressHistory = true
+        seekB?.progress = brightnessProgress
+        seekC?.progress = contrastProgress
+        seekS?.progress = saturationProgress
+        suppressHistory = false
+        renderPreview()
+    }
+
+    private fun undoEdit() {
+        if (undoStack.isEmpty()) return
+        val current = snapshotState()
+        val prev = undoStack.removeLast()
+        redoStack.addLast(current)
+        applyState(prev)
+        updateHistoryButtons()
+    }
+
+    private fun redoEdit() {
+        if (redoStack.isEmpty()) return
+        val current = snapshotState()
+        val next = redoStack.removeLast()
+        undoStack.addLast(current)
+        applyState(next)
+        updateHistoryButtons()
+    }
+
+    private fun updateHistoryButtons() {
+        val undoBtn: android.view.View? = try { binding.root.findViewById(R.id.btnUndo) } catch (_: Throwable) { null }
+        val redoBtn: android.view.View? = try { binding.root.findViewById(R.id.btnRedo) } catch (_: Throwable) { null }
+        undoBtn?.isEnabled = undoStack.isNotEmpty()
+        redoBtn?.isEnabled = redoStack.isNotEmpty()
+        undoBtn?.alpha = if (undoStack.isNotEmpty()) 1f else 0.5f
+        redoBtn?.alpha = if (redoStack.isNotEmpty()) 1f else 0.5f
     }
 }

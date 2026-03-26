@@ -1,33 +1,124 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="24dp">
+    android:background="#0F1115"
+    android:fillViewport="true">
 
-    <TextView
-        android:id="@+id/title"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="7KSTUDIO"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        android:paddingBottom="16dp"/>
-
-    <Button
-        android:id="@+id/btnPhoto"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Photo Editor"/>
+        android:orientation="vertical"
+        android:padding="@dimen/studio_page_padding">
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="12dp"/>
+        <TextView
+            android:id="@+id/title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="7K Studio"
+            android:textColor="#FFFFFF"
+            android:textSize="@dimen/studio_title_size"
+            android:textStyle="bold" />
 
-    <Button
-        android:id="@+id/btnVideo"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Video Editor"/>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Powerful Photo + Video Editing"
+            android:textColor="#A8B0BE"
+            android:textSize="@dimen/studio_subtitle_size" />
 
-</LinearLayout>
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            app:cardBackgroundColor="#171B24"
+            app:cardCornerRadius="18dp"
+            app:cardElevation="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Photo Editor"
+                    android:textColor="#FFFFFF"
+                    android:textSize="@dimen/studio_section_title_size"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Crop, rotate, flip, filters, brightness, contrast, saturation, export to gallery"
+                    android:textColor="#A8B0BE"
+                    android:textSize="@dimen/studio_body_size" />
+
+                <Button
+                    android:id="@+id/btnPhoto"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:background="@drawable/studio_glass_button_primary"
+                    android:minHeight="@dimen/studio_button_min_height"
+                    android:text="Open Photo Editor"
+                    android:textAllCaps="false"
+                    android:paddingHorizontal="14dp"
+                    android:textColor="#FFFFFF"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            app:cardBackgroundColor="#171B24"
+            app:cardCornerRadius="18dp"
+            app:cardElevation="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Video Editor"
+                    android:textColor="#FFFFFF"
+                    android:textSize="@dimen/studio_section_title_size"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Trim, mute export, rotate, speed control, frame extraction, music replace"
+                    android:textColor="#A8B0BE"
+                    android:textSize="@dimen/studio_body_size" />
+
+                <Button
+                    android:id="@+id/btnVideo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:background="@drawable/studio_glass_button_teal"
+                    android:minHeight="@dimen/studio_button_min_height"
+                    android:text="Open Video Editor"
+                    android:textAllCaps="false"
+                    android:paddingHorizontal="14dp"
+                    android:textColor="#FFFFFF"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+    </LinearLayout>
+
+</ScrollView>

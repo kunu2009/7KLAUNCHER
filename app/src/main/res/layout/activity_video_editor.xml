@@ -1,218 +1,362 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:background="#0F1115"
+    android:padding="@dimen/studio_page_padding">
 
-    <LinearLayout
-        android:layout_width="match_parent"
+    <TextView
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:text="Video Editor"
+        android:textColor="#FFFFFF"
+        android:textSize="@dimen/studio_section_title_size"
+        android:textStyle="bold" />
 
-        <Button
-            android:id="@+id/btnPickVideo"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Pick Video" />
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="Trim, speed, rotate, mute, frames, music replace"
+        android:textColor="#9EA8B8"
+        android:textSize="@dimen/studio_subtitle_size" />
 
-        <Button
-            android:id="@+id/btnTrim10s"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:text="Trim 10s" />
-
-        <Button
-            android:id="@+id/btnSpeed05"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:text="0.5x" />
-
-        <Button
-            android:id="@+id/btnSpeed15"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="1.5x" />
-
-        <Button
-            android:id="@+id/btnSpeed2"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="2x" />
-    </LinearLayout>
-
-    <VideoView
-        android:id="@+id/videoView"
+    <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
         android:layout_height="0dp"
+        android:layout_marginTop="10dp"
         android:layout_weight="1"
-        android:layout_marginTop="12dp"
-        android:background="#202020" />
+        app:cardBackgroundColor="#171B24"
+        app:cardCornerRadius="14dp"
+        app:cardElevation="0dp">
+
+        <VideoView
+            android:id="@+id/videoView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#11151D"
+            android:contentDescription="Video preview player" />
+    </androidx.cardview.widget.CardView>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginTop="12dp">
+        android:layout_marginTop="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
-        <Button
-            android:id="@+id/btnPlayPause"
-            android:layout_width="wrap_content"
+        <TextView
+            android:id="@+id/tvCurrentTime"
+            android:layout_width="@dimen/studio_label_width"
             android:layout_height="wrap_content"
-            android:text="Play" />
+            android:text="00:00"
+            android:textColor="#C7CFDA"
+            android:textSize="@dimen/studio_subtitle_size" />
 
-        <Button
-            android:id="@+id/btnMuteExport"
-            android:layout_width="wrap_content"
+        <SeekBar
+            android:id="@+id/seekPreview"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:text="Export Mute" />
+            android:layout_weight="1"
+            android:contentDescription="Video timeline scrubber"
+            android:max="1000"
+            android:progress="0" />
 
-        <Button
-            android:id="@+id/btnExtractFrame"
-            android:layout_width="wrap_content"
+        <TextView
+            android:id="@+id/tvDuration"
+            android:layout_width="@dimen/studio_label_width"
             android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:text="Extract Frame" />
-
-        <Button
-            android:id="@+id/btnRotate90"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:text="Rotate 90°" />
+            android:gravity="end"
+            android:text="00:00"
+            android:textColor="#C7CFDA"
+            android:textSize="@dimen/studio_subtitle_size" />
     </LinearLayout>
 
-    <LinearLayout
+    <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginTop="12dp">
+        android:layout_marginTop="10dp"
+        android:scrollbars="none">
 
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:orientation="horizontal">
+
             <Button
-                android:id="@+id/btnPickMusic"
+                android:id="@+id/btnPickVideo"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Pick Music" />
+                android:background="@drawable/studio_glass_button_primary"
+                android:contentDescription="Import video"
+                android:minHeight="@dimen/studio_button_min_height"
+                android:minWidth="@dimen/studio_button_min_width"
+                android:text="Import"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF" />
+
             <Button
-                android:id="@+id/btnExportWithMusic"
+                android:id="@+id/btnPlayPause"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:text="Export + Music" />
-        </LinearLayout>
+                android:layout_marginStart="8dp"
+                android:background="@drawable/studio_glass_button_secondary"
+                android:contentDescription="Play or pause video"
+                android:minHeight="@dimen/studio_button_min_height"
+                android:minWidth="@dimen/studio_button_min_width"
+                android:text="Play"
+                android:textAllCaps="false" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="8dp"
-            android:gravity="center_vertical">
-            <TextView
+            <Button
+                android:id="@+id/btnTrim10s"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Video Vol"
-                android:layout_marginEnd="8dp" />
-            <SeekBar
-                android:id="@+id/seekVolVideo"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:max="100"
-                android:progress="70" />
-        </LinearLayout>
+                android:layout_marginStart="8dp"
+                android:background="@drawable/studio_glass_button_secondary"
+                android:contentDescription="Trim first ten seconds"
+                android:minHeight="@dimen/studio_button_min_height"
+                android:minWidth="@dimen/studio_button_min_width"
+                android:text="Trim 10s"
+                android:textAllCaps="false" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="4dp"
-            android:gravity="center_vertical">
-            <TextView
+            <Button
+                android:id="@+id/btnRotate90"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Music Vol"
-                android:layout_marginEnd="8dp" />
-            <SeekBar
-                android:id="@+id/seekVolMusic"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:max="100"
-                android:progress="70" />
-        </LinearLayout>
-    </LinearLayout>
+                android:layout_marginStart="8dp"
+                android:background="@drawable/studio_glass_button_secondary"
+                android:contentDescription="Export rotated ninety degrees"
+                android:minHeight="@dimen/studio_button_min_height"
+                android:minWidth="@dimen/studio_button_min_width"
+                android:text="Rotate 90°"
+                android:textAllCaps="false" />
 
-    <!-- Range Trim Controls -->
-    <LinearLayout
+            <Button
+                android:id="@+id/btnMuteExport"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/studio_glass_button_secondary"
+                android:contentDescription="Export video without audio"
+                android:minHeight="@dimen/studio_button_min_height"
+                android:minWidth="@dimen/studio_button_min_width"
+                android:text="Mute Export"
+                android:textAllCaps="false" />
+
+            <Button
+                android:id="@+id/btnExtractFrame"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/studio_glass_button_secondary"
+                android:contentDescription="Extract current frame as image"
+                android:minHeight="@dimen/studio_button_min_height"
+                android:minWidth="@dimen/studio_button_min_width"
+                android:text="Extract Frame"
+                android:textAllCaps="false" />
+
+            <Button
+                android:id="@+id/btnSpeed05"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/studio_glass_button_secondary"
+                android:contentDescription="Export at half speed"
+                android:minHeight="@dimen/studio_button_min_height"
+                android:minWidth="@dimen/studio_button_min_width"
+                android:text="0.5x"
+                android:textAllCaps="false" />
+
+            <Button
+                android:id="@+id/btnSpeed15"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/studio_glass_button_secondary"
+                android:contentDescription="Export at one point five speed"
+                android:minHeight="@dimen/studio_button_min_height"
+                android:minWidth="@dimen/studio_button_min_width"
+                android:text="1.5x"
+                android:textAllCaps="false" />
+
+            <Button
+                android:id="@+id/btnSpeed2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/studio_glass_button_secondary"
+                android:contentDescription="Export at double speed"
+                android:minHeight="@dimen/studio_button_min_height"
+                android:minWidth="@dimen/studio_button_min_width"
+                android:text="2x"
+                android:textAllCaps="false" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginTop="12dp">
+        android:layout_marginTop="10dp"
+        app:cardBackgroundColor="#171B24"
+        app:cardCornerRadius="14dp"
+        app:cardElevation="0dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-            <TextView
-                android:id="@+id/labelStart"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Start: 0s"
-                android:layout_marginEnd="8dp" />
-            <SeekBar
-                android:id="@+id/seekStart"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:max="1000"
-                android:progress="0" />
-        </LinearLayout>
+            android:orientation="vertical"
+            android:padding="12dp">
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginTop="4dp">
-            <TextView
-                android:id="@+id/labelEnd"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="End: 0s"
-                android:layout_marginEnd="8dp" />
-            <SeekBar
-                android:id="@+id/seekEnd"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:max="1000"
-                android:progress="1000" />
-        </LinearLayout>
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-        <Button
-            android:id="@+id/btnExportTrimRange"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="Export Trim Range" />
-    </LinearLayout>
+                <Button
+                    android:id="@+id/btnPickMusic"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/studio_glass_button_secondary"
+                    android:contentDescription="Pick replacement music"
+                    android:minHeight="@dimen/studio_button_min_height"
+                    android:minWidth="@dimen/studio_button_min_width"
+                    android:text="Pick Music"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/btnExportWithMusic"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/studio_glass_button_teal"
+                    android:contentDescription="Export video with selected music"
+                    android:minHeight="@dimen/studio_button_min_height"
+                    android:minWidth="@dimen/studio_button_min_width"
+                    android:text="Export + Music"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="@dimen/studio_label_width"
+                    android:layout_height="wrap_content"
+                    android:text="Video Vol"
+                    android:textColor="#C7CFDA"
+                    android:textSize="@dimen/studio_subtitle_size" />
+
+                <SeekBar
+                    android:id="@+id/seekVolVideo"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:contentDescription="Video volume slider"
+                    android:max="100"
+                    android:progress="70" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="@dimen/studio_label_width"
+                    android:layout_height="wrap_content"
+                    android:text="Music Vol"
+                    android:textColor="#C7CFDA"
+                    android:textSize="@dimen/studio_subtitle_size" />
+
+                <SeekBar
+                    android:id="@+id/seekVolMusic"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:contentDescription="Music volume slider"
+                    android:max="100"
+                    android:progress="70" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/labelStart"
+                    android:layout_width="@dimen/studio_label_width"
+                    android:layout_height="wrap_content"
+                    android:text="Start: 0s"
+                    android:textColor="#C7CFDA"
+                    android:textSize="@dimen/studio_subtitle_size" />
+
+                <SeekBar
+                    android:id="@+id/seekStart"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:contentDescription="Trim start slider"
+                    android:max="1000"
+                    android:progress="0" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/labelEnd"
+                    android:layout_width="@dimen/studio_label_width"
+                    android:layout_height="wrap_content"
+                    android:text="End: 0s"
+                    android:textColor="#C7CFDA"
+                    android:textSize="@dimen/studio_subtitle_size" />
+
+                <SeekBar
+                    android:id="@+id/seekEnd"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:contentDescription="Trim end slider"
+                    android:max="1000"
+                    android:progress="1000" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/btnExportTrimRange"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/studio_glass_button_primary"
+                android:contentDescription="Export selected trim range"
+                android:minHeight="@dimen/studio_button_min_height"
+                android:text="Export Trim Range"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF" />
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
 
     <TextView
         android:id="@+id/info"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingTop="16dp"
-        android:text="No video selected" />
+        android:layout_marginTop="8dp"
+        android:text="No video selected"
+        android:textColor="#9EA8B8"
+        android:textSize="@dimen/studio_subtitle_size" />
 
 </LinearLayout>

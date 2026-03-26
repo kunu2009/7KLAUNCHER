@@ -39,7 +39,6 @@ class HomePageFragment : Fragment() {
         val prefs = requireContext().getSharedPreferences("sevenk_launcher_prefs", Context.MODE_PRIVATE)
         val homeCols = prefs.getInt("home_columns", 4).coerceIn(3, 6)
         recycler.layoutManager = GridLayoutManager(requireContext(), homeCols)
-        recycler.setHasFixedSize(true)
         // Ensure long-press anywhere on the page can open Home Options
         view.isLongClickable = true
         view.setOnLongClickListener {
@@ -188,9 +187,6 @@ class HomePageFragment : Fragment() {
     private fun showFolderDialog(folderItem: HomeItem.FolderItem) {
         val act = activity as? LauncherActivity ?: return
         val folder = folderItem.folder
-
-        // Use the getAppList() method instead of directly accessing the private field
-        val allApps = act.getAppList()
 
         val folderApps = folder.apps
         val content = layoutInflater.inflate(R.layout.folder_dialog_content, null, false)

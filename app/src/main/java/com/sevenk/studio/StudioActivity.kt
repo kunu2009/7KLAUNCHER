@@ -8,6 +8,19 @@ import com.sevenk.launcher.R
 class StudioActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // If launched from Studio Templates, jump directly into Photo Editor with that template.
+        val template = intent.getStringExtra("studio_template_name")
+        if (!template.isNullOrBlank()) {
+            startActivity(
+                Intent(this, PhotoEditorActivity::class.java).apply {
+                    putExtra("studio_template_name", template)
+                }
+            )
+            finish()
+            return
+        }
+
         setContentView(R.layout.activity_studio)
 
         findViewById<android.view.View>(R.id.btnPhoto).setOnClickListener {
