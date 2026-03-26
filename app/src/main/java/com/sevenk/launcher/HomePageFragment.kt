@@ -8,10 +8,11 @@ import android.content.Context
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.FrameLayout
-import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.bottomsheet.BottomSheetDialog
 
 class HomePageFragment : Fragment() {
     private var pageIndex: Int = 0
@@ -55,53 +56,45 @@ class HomePageFragment : Fragment() {
         }, onAppLongPress = { app ->
             val act = activity as? LauncherActivity ?: return@HomePageAdapter
             val totalPages = act.getNormalHomePages()
-            val options = mutableListOf<String>()
             val actions = mutableListOf<() -> Unit>()
+            val labels = mutableListOf<String>()
             // Remove
-            options.add("Remove from this page")
+            labels.add("Remove from this page")
             actions.add {
                 act.removeFromHomePage(pageIndex, app.packageName)
                 refreshData()
             }
             // Add to new folder
-            options.add("Add to New Folder")
+            labels.add("Add to New Folder")
             actions.add {
-                val input = EditText(requireContext())
-                input.hint = "Folder name"
-                AlertDialog.Builder(requireContext())
-                    .setTitle("New Folder")
-                    .setView(input)
-                    .setPositiveButton("Create") { d, _ ->
-                        val name = input.text?.toString() ?: ""
-                        act.createFolder(pageIndex, name, app.packageName)
-                        act.removeFromHomePage(pageIndex, app.packageName)
-                        refreshData()
-                        d.dismiss()
-                    }
-                    .setNegativeButton("Cancel", null)
-                    .show()
+                showGlassInputSheet(
+                    title = "New Folder",
+                    hint = "Folder name",
+                    submitLabel = "Create"
+                ) { name ->
+                    act.createFolder(pageIndex, name, app.packageName)
+                    act.removeFromHomePage(pageIndex, app.packageName)
+                    refreshData()
+                }
             }
             // Add to existing folder (if any)
             val existingFolders = act.getFolders(pageIndex)
             if (existingFolders.isNotEmpty()) {
-                options.add("Add to Existing Folder")
+                labels.add("Add to Existing Folder")
                 actions.add {
-                    val names = existingFolders.map { it.name }.toTypedArray()
-                    AlertDialog.Builder(requireContext())
-                        .setTitle("Choose Folder")
-                        .setItems(names) { d, which ->
+                    val folderActions = existingFolders.mapIndexed { which, folder ->
+                        folder.name to {
                             act.addToFolder(pageIndex, which, app.packageName)
                             act.removeFromHomePage(pageIndex, app.packageName)
                             refreshData()
-                            d.dismiss()
                         }
-                        .setNegativeButton("Cancel", null)
-                        .show()
+                    }
+                    act.showLauncherActionSheet("Choose Folder", folderActions)
                 }
             }
             // Move left
             if (pageIndex > 0) {
-                options.add("Move to Page ${'$'}pageIndex")
+                labels.add("Move to Page ${'$'}pageIndex")
                 actions.add {
                     act.moveHomeShortcut(pageIndex, pageIndex - 1, app.packageName)
                     act.refreshHomePages()
@@ -109,52 +102,36 @@ class HomePageFragment : Fragment() {
             }
             // Move right
             if (pageIndex < totalPages - 1) {
-                options.add("Move to Page ${'$'}{pageIndex + 2}")
+                labels.add("Move to Page ${'$'}{pageIndex + 2}")
                 actions.add {
                     act.moveHomeShortcut(pageIndex, pageIndex + 1, app.packageName)
                     act.refreshHomePages()
                 }
             }
-            AlertDialog.Builder(requireContext())
-                .setTitle(app.name)
-                .setItems(options.toTypedArray()) { d, which ->
-                    actions[which].invoke()
-                    d.dismiss()
-                }
-                .setNegativeButton("Cancel", null)
-                .show()
+            val sheetActions = labels.mapIndexed { index, label -> label to { actions[index].invoke() } }
+            act.showLauncherActionSheet(app.name, sheetActions)
         }, onFolderClick = { folderItem ->
             showFolderDialog(folderItem)
         }, onFolderLongPress = { folderItem ->
             val act = activity as? LauncherActivity ?: return@HomePageAdapter
-            val options = arrayOf("Rename Folder", "Delete Folder (move apps back)")
-            AlertDialog.Builder(requireContext())
-                .setTitle(folderItem.folder.name)
-                .setItems(options) { d: android.content.DialogInterface, which: Int ->
-                    when (which) {
-                        0 -> {
-                            val input = EditText(requireContext())
-                            input.setText(folderItem.folder.name)
-                            AlertDialog.Builder(requireContext())
-                                .setTitle("Rename Folder")
-                                .setView(input)
-                                .setPositiveButton("Save") { dd: android.content.DialogInterface, _ ->
-                                    act.renameFolder(folderItem.pageIndex, folderItem.folderIndex, input.text?.toString() ?: "")
-                                    refreshData()
-                                    dd.dismiss()
-                                }
-                                .setNegativeButton("Cancel", null)
-                                .show()
-                        }
-                        1 -> {
-                            act.deleteFolder(folderItem.pageIndex, folderItem.folderIndex, moveAppsBackToPage = true)
-                            refreshData()
-                        }
+            val actions = listOf(
+                "Rename Folder" to {
+                    showGlassInputSheet(
+                        title = "Rename Folder",
+                        hint = "Folder name",
+                        initialValue = folderItem.folder.name,
+                        submitLabel = "Save"
+                    ) { newName ->
+                        act.renameFolder(folderItem.pageIndex, folderItem.folderIndex, newName)
+                        refreshData()
                     }
-                    d.dismiss()
+                },
+                "Delete Folder (move apps back)" to {
+                    act.deleteFolder(folderItem.pageIndex, folderItem.folderIndex, moveAppsBackToPage = true)
+                    refreshData()
                 }
-                .setNegativeButton("Cancel", null)
-                .show()
+            )
+            act.showLauncherActionSheet(folderItem.folder.name, actions)
         }, iconPackHelper = (activity as? LauncherActivity)?.getIconPackHelper())
         recycler.adapter = adapter
         refreshData()
@@ -203,10 +180,9 @@ class HomePageFragment : Fragment() {
         grid.adapter = FolderGridAdapter(folderApps) { app ->
             (activity as? LauncherActivity)?.launchApp(app)
         }
-        val dialog = AlertDialog.Builder(requireContext())
-            .setView(content)
-            .setNegativeButton("Close", null)
-            .create()
+        val dialog = BottomSheetDialog(requireContext())
+        content.setBackgroundResource(R.drawable.dialog_background)
+        dialog.setContentView(content)
         btnAdd.setOnClickListener {
             dialog.dismiss()
             act.startAddToFolderMode(folderItem.pageIndex, folderItem.folderIndex)
@@ -244,6 +220,96 @@ class HomePageFragment : Fragment() {
         }
         dialog.show()
     }
+
+    private fun showGlassInputSheet(
+        title: String,
+        hint: String,
+        initialValue: String = "",
+        submitLabel: String = "Save",
+        onSubmit: (String) -> Unit
+    ) {
+        val ctx = requireContext()
+        val sheet = BottomSheetDialog(ctx)
+        val root = android.widget.LinearLayout(ctx).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(20))
+            setBackgroundResource(R.drawable.dialog_background)
+        }
+
+        val titleView = TextView(ctx).apply {
+            text = title
+            textSize = 18f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(8), dp(4), dp(8), dp(12))
+        }
+        root.addView(titleView)
+
+        val input = EditText(ctx).apply {
+            this.hint = hint
+            setText(initialValue)
+            setTextColor(0xFFFFFFFF.toInt())
+            setHintTextColor(0x99FFFFFF.toInt())
+            setBackgroundResource(R.drawable.glass_panel)
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            setSingleLine()
+            imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_DONE
+            setOnEditorActionListener { _, actionId, _ ->
+                if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE) {
+                    onSubmit(text?.toString().orEmpty())
+                    sheet.dismiss()
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+        val inputLp = android.widget.LinearLayout.LayoutParams(
+            android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(12) }
+        root.addView(input, inputLp)
+
+        val submit = TextView(ctx).apply {
+            text = submitLabel
+            textSize = 15f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            setBackgroundResource(R.drawable.glass_panel)
+            foreground = AppCompatResources.getDrawable(ctx, android.R.drawable.list_selector_background)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                onSubmit(input.text?.toString().orEmpty())
+                sheet.dismiss()
+            }
+        }
+        val submitLp = android.widget.LinearLayout.LayoutParams(
+            android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(8) }
+        root.addView(submit, submitLp)
+
+        val cancel = TextView(ctx).apply {
+            text = "Cancel"
+            textSize = 14f
+            setTextColor(0xFF80CBC4.toInt())
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            gravity = android.view.Gravity.CENTER
+            setOnClickListener { sheet.dismiss() }
+        }
+        root.addView(cancel)
+
+        sheet.setContentView(root)
+        sheet.setOnShowListener {
+            input.requestFocus()
+            input.setSelection(input.text?.length ?: 0)
+            val imm = ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+            imm?.showSoftInput(input, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        }
+        sheet.show()
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     companion object {
         private const val ARG_PAGE_INDEX = "page_index"

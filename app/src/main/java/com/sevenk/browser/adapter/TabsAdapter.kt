@@ -41,6 +41,7 @@ class TabsAdapter(
     class TabViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val title: TextView = itemView.findViewById(R.id.tabTitle)
         private val url: TextView = itemView.findViewById(R.id.tabUrl)
+        private val groupChip: TextView = itemView.findViewById(R.id.tabGroupChip)
         private val favicon: ImageView = itemView.findViewById(R.id.tabFavicon)
         val closeButton: ImageView = itemView.findViewById(R.id.tabClose)
         val cardView: MaterialCardView = itemView.findViewById(R.id.tabCard)
@@ -48,7 +49,8 @@ class TabsAdapter(
         fun bind(tab: Tab) {
             title.text = tab.title.ifEmpty { "New Tab" }
             val safeUrl = tab.url.ifEmpty { "" }
-            url.text = "${tab.groupName} • $safeUrl".trim().trimEnd('•').trim()
+            url.text = safeUrl
+            groupChip.text = tab.groupName.ifBlank { "General" }
             
             // Load favicon
             tab.webView.favicon?.let { icon ->

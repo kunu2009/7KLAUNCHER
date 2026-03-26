@@ -2,6 +2,7 @@ package com.sevenk.launcher
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.content.Context
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -21,6 +22,17 @@ class HomePageAdapter(
     private val onFolderLongPress: ((HomeItem.FolderItem) -> Unit)? = null,
     private val iconPackHelper: IconPackHelper? = null
 ) : ListAdapter<HomeItem, RecyclerView.ViewHolder>(Diff) {
+
+    private fun getConfiguredHomeIconSizePx(context: Context): Int {
+        val prefs = context.getSharedPreferences("sevenk_launcher_prefs", Context.MODE_PRIVATE)
+        val mode = prefs.getInt("icon_size", 1).coerceIn(0, 2)
+        val dimen = when (mode) {
+            0 -> R.dimen.app_icon_size_small
+            2 -> R.dimen.app_icon_size_large
+            else -> R.dimen.app_icon_size_medium
+        }
+        return context.resources.getDimensionPixelSize(dimen)
+    }
 
     private companion object {
         const val TYPE_APP = 0
@@ -66,8 +78,12 @@ class HomePageAdapter(
             is HomeItem.App -> {
                 val h = holder as AppVH
                 val app = item.appInfo
-                val size = h.itemView.resources.getDimensionPixelSize(R.dimen.icon_size)
                 val ctx = h.itemView.context
+                val size = getConfiguredHomeIconSizePx(ctx)
+                h.icon.layoutParams = h.icon.layoutParams.apply {
+                    width = size
+                    height = size
+                }
                 val bmp = try {
                     // Default app icon
                     val defaultIcon = ctx.packageManager.getApplicationIcon(app.packageName)
@@ -130,7 +146,11 @@ class HomePageAdapter(
                 h.name.text = item.folder.name
                 // Build a 2x2 mosaic preview from first four app icons in the folder
                 val ctx = h.itemView.context
-                val size = h.itemView.resources.getDimensionPixelSize(R.dimen.icon_size)
+                val size = getConfiguredHomeIconSizePx(ctx)
+                h.icon.layoutParams = h.icon.layoutParams.apply {
+                    width = size
+                    height = size
+                }
                 val half = size / 2
                 val padding = (h.itemView.resources.displayMetrics.density * 2).toInt() // 2dp gap
                 val apps = item.folder.apps

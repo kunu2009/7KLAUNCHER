@@ -26,6 +26,8 @@ import androidx.core.view.WindowCompat
 import androidx.annotation.RequiresApi
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
+import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
 import com.sevenk.launcher.R
 import com.sevenk.launcher.databinding.ActivityBrowserBinding
 import com.sevenk.browser.privacy.PrivacyManager
@@ -156,6 +158,7 @@ class BrowserActivity : AppCompatActivity() {
             if (view == tab.webView) {
                 tab.url = url ?: ""
                 tab.lastActiveTime = System.currentTimeMillis()
+                view?.alpha = 0.9f
                 updateUI()
             }
         }
@@ -166,6 +169,7 @@ class BrowserActivity : AppCompatActivity() {
             if (view == tab.webView) {
                 if (!tab.isIncognito) addSuggestion(url ?: "")
                 applyReaderMode(tab.webView, tab.readerModeEnabled)
+                view?.animate()?.alpha(1f)?.setDuration(180)?.start()
                 updateUI()
             }
         }
@@ -384,7 +388,21 @@ class BrowserActivity : AppCompatActivity() {
     }
     
     private fun setupFab() {
-        binding.fabNewTab.setOnClickListener { openNewTab() }
+        binding.fabNewTab.setOnClickListener {
+            binding.fabNewTab.animate()
+                .scaleX(0.9f)
+                .scaleY(0.9f)
+                .setDuration(90)
+                .withEndAction {
+                    binding.fabNewTab.animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .setDuration(120)
+                        .start()
+                }
+                .start()
+            openNewTab()
+        }
     }
     
     private fun openNewTab(initialUrl: String? = null) {
@@ -408,6 +426,8 @@ class BrowserActivity : AppCompatActivity() {
         // Add WebView to container
         binding.webContainer.removeAllViews()
         binding.webContainer.addView(webView)
+        webView.alpha = 0f
+        webView.animate().alpha(1f).setDuration(220).start()
         
         // Load URL if provided
         if (url != "about:blank") {
@@ -427,8 +447,7 @@ class BrowserActivity : AppCompatActivity() {
         tabs.removeAt(index)
         currentTabIndex = (index - 1).coerceAtLeast(0).coerceAtMost(tabs.lastIndex)
         if (tabs.isNotEmpty()) {
-            binding.webContainer.removeAllViews()
-            binding.webContainer.addView(tabs[currentTabIndex].webView)
+            switchToTab(currentTabIndex, animate = true)
             updateUI()
         } else finish()
     }
@@ -447,10 +466,30 @@ class BrowserActivity : AppCompatActivity() {
         currentTabIndex = if (currentTabIndex >= tabs.size) tabs.size - 1 else currentTabIndex
         
         if (tabs.isNotEmpty()) {
-            binding.webContainer.addView(currentTab?.webView)
+            switchToTab(currentTabIndex, animate = true)
             updateUI()
         } else {
             finish()
+        }
+    }
+
+    private fun switchToTab(index: Int, animate: Boolean) {
+        val tab = tabs.getOrNull(index) ?: return
+        currentTabIndex = index
+        val nextView = tab.webView
+        binding.webContainer.removeAllViews()
+        binding.webContainer.addView(nextView)
+        if (animate) {
+            nextView.alpha = 0f
+            nextView.translationY = 16f
+            nextView.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(220)
+                .start()
+        } else {
+            nextView.alpha = 1f
+            nextView.translationY = 0f
         }
     }
     
@@ -505,16 +544,23 @@ class BrowserActivity : AppCompatActivity() {
     private fun showTabsDialog() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_tabs, null)
         val recyclerView = dialogView.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.tabsRecyclerView)
-        val displayPairs = tabs.mapIndexed { index, tab -> index to tab }
-            .filter { (_, tab) -> currentGroupFilter == null || tab.groupName == currentGroupFilter }
-
+        val chips = dialogView.findViewById<ChipGroup>(R.id.tabsGroupChips)
         recyclerView.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
-        recyclerView.adapter = com.sevenk.browser.adapter.TabsAdapter(displayPairs.map { it.second }) { position ->
-            val actualIndex = displayPairs.getOrNull(position)?.first ?: return@TabsAdapter
-            currentTabIndex = actualIndex
-            binding.webContainer.removeAllViews()
-            binding.webContainer.addView(tabs[actualIndex].webView)
-            updateUI()
+        var displayPairs = emptyList<Pair<Int, Tab>>()
+        val refreshList = {
+            displayPairs = tabs.mapIndexed { index, tab -> index to tab }
+                .filter { (_, tab) -> currentGroupFilter == null || tab.groupName == currentGroupFilter }
+            recyclerView.adapter = com.sevenk.browser.adapter.TabsAdapter(displayPairs.map { it.second }) { position ->
+                val actualIndex = displayPairs.getOrNull(position)?.first ?: return@TabsAdapter
+                switchToTab(actualIndex, animate = true)
+                updateUI()
+            }
+        }
+        refreshList()
+
+        setupGroupFilterChips(chips) { selectedGroup ->
+            currentGroupFilter = selectedGroup
+            refreshList()
         }
 
         val suffix = currentGroupFilter?.let { " • Group: $it" }.orEmpty()
@@ -525,6 +571,35 @@ class BrowserActivity : AppCompatActivity() {
             .setNeutralButton("Groups") { _, _ -> showTabGroupsDialog() }
             .setNegativeButton("Close", null)
             .show()
+    }
+
+    private fun setupGroupFilterChips(
+        chipGroup: ChipGroup,
+        onGroupChanged: (String?) -> Unit
+    ) {
+        chipGroup.removeAllViews()
+        val groups = tabs.map { it.groupName.ifBlank { "General" } }.distinct().sorted()
+        val labels = listOf("All") + groups
+        labels.forEach { label ->
+            val chip = Chip(this).apply {
+                text = label
+                isCheckable = true
+                isClickable = true
+                isCheckedIconVisible = false
+                chipStrokeWidth = 0f
+                setEnsureMinTouchTargetSize(false)
+                setOnClickListener {
+                    onGroupChanged(if (label == "All") null else label)
+                }
+            }
+            val checked = if (currentGroupFilter == null) {
+                label == "All"
+            } else {
+                label == currentGroupFilter
+            }
+            chip.isChecked = checked
+            chipGroup.addView(chip)
+        }
     }
     
     private fun showBookmarks() {

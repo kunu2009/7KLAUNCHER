@@ -65,6 +65,8 @@ import com.sevenk.launcher.optimization.RAMOptimizer
 import android.os.Process
 import com.sevenk.launcher.gesture.GestureManager
 import com.sevenk.launcher.drawer.AppDrawerFragment
+import com.sevenk.launcher.privacy.AppPrivacyManager
+import com.google.android.material.bottomsheet.BottomSheetDialog
 
 class LauncherActivity : AppCompatActivity() {
     private lateinit var appDrawerContainer: ViewGroup
@@ -88,6 +90,7 @@ class LauncherActivity : AppCompatActivity() {
     private lateinit var widgetsContainer: FrameLayout
     private lateinit var appWidgetHost: AppWidgetHost
     private lateinit var appWidgetManager: AppWidgetManager
+    private lateinit var appPrivacyManager: AppPrivacyManager
     private val prefs by lazy { getSharedPreferences("sevenk_launcher_prefs", MODE_PRIVATE) }
     
     // Enhanced managers
@@ -229,6 +232,14 @@ class LauncherActivity : AppCompatActivity() {
             
             // Add internal synthetic apps
             addInternalApps(apps)
+
+            // Respect hidden-app privacy settings
+            if (::appPrivacyManager.isInitialized) {
+                val hiddenPackages = appPrivacyManager.getHiddenApps()
+                if (hiddenPackages.isNotEmpty()) {
+                    apps.removeAll { it.packageName in hiddenPackages }
+                }
+            }
             
             // Sort apps alphabetically by name
             apps.sortBy { it.name.lowercase() }
@@ -730,6 +741,7 @@ class LauncherActivity : AppCompatActivity() {
     private lateinit var iconPackHelper: IconPackHelper
     private val REQ_PICK_BACKGROUND = 5012
     private var prewarmJob: kotlinx.coroutines.Job? = null
+    private val oneShotUnlockedPackages = mutableSetOf<String>()
 
     private fun applyGlassBlurIfPossible(view: View?, radius: Float) {
         if (view == null) return
@@ -915,44 +927,193 @@ private fun showSidebarItemOptions(app: AppInfo) {
     }
     actions += "Edit Sidebar" to { startEditSidebarMode() }
 
-    AlertDialog.Builder(this)
-        .setTitle(app.name)
-        .setItems(actions.map { it.first }.toTypedArray()) { d, which ->
-            actions.getOrNull(which)?.second?.invoke()
-            d.dismiss()
-        }
-        .setNegativeButton("Cancel", null)
-        .show()
+    showGlassActionSheet(app.name, actions)
 }
 
 private fun showDockContextMenu(show: Boolean = true) {
     if (!show) return
     
     // Show dock configuration options
-    val options = arrayOf(
-        "Edit Dock",
-        "Add Widget",
-        "Dock Settings",
-        "Glass Effects"
+    val actions = listOf(
+        "Edit Dock" to { startEditDockMode() },
+        "Add Widget" to { showAddWidgetDialog() },
+        "Dock Settings" to { showDockSettings() },
+        "Glass Effects" to { toggleGlassEffects() }
     )
-    
-    AlertDialog.Builder(this)
-        .setTitle("Dock Options")
-        .setItems(options) { _, which ->
-            when (which) {
-                0 -> startEditDockMode()
-                1 -> showAddWidgetDialog()
-                2 -> showDockSettings()
-                3 -> toggleGlassEffects()
+    showGlassActionSheet("Dock Options", actions)
+}
+
+private fun showGlassActionSheet(title: String, actions: List<Pair<String, () -> Unit>>) {
+    val sheet = BottomSheetDialog(this)
+    val root = android.widget.LinearLayout(this).apply {
+        orientation = android.widget.LinearLayout.VERTICAL
+        setPadding(dp(16), dp(16), dp(16), dp(20))
+        setBackgroundResource(R.drawable.dialog_background)
+    }
+
+    val titleView = android.widget.TextView(this).apply {
+        text = title
+        textSize = 18f
+        setTextColor(0xFFFFFFFF.toInt())
+        setPadding(dp(8), dp(4), dp(8), dp(12))
+    }
+    root.addView(titleView)
+
+    actions.forEach { (label, onClick) ->
+        val item = android.widget.TextView(this).apply {
+            text = label
+            textSize = 15f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            setBackgroundResource(R.drawable.glass_panel)
+            foreground = AppCompatResources.getDrawable(this@LauncherActivity, android.R.drawable.list_selector_background)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                sheet.dismiss()
+                onClick.invoke()
             }
         }
-        .setNegativeButton("Cancel", null)
-        .show()
+        val lp = android.widget.LinearLayout.LayoutParams(
+            android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(8) }
+        root.addView(item, lp)
+    }
+
+    val cancel = android.widget.TextView(this).apply {
+        text = "Cancel"
+        textSize = 14f
+        setTextColor(0xFF80CBC4.toInt())
+        setPadding(dp(16), dp(12), dp(16), dp(12))
+        gravity = android.view.Gravity.CENTER
+        setOnClickListener { sheet.dismiss() }
+    }
+    root.addView(cancel)
+
+    sheet.setContentView(root)
+    sheet.show()
+}
+
+private fun showGlassInputSheet(
+    title: String,
+    hint: String,
+    initialValue: String = "",
+    submitLabel: String = "Save",
+    inputType: Int? = null,
+    secondaryActionLabel: String? = null,
+    onSecondaryAction: (() -> Unit)? = null,
+    onSubmit: (String) -> Unit
+) {
+    val sheet = BottomSheetDialog(this)
+    val root = android.widget.LinearLayout(this).apply {
+        orientation = android.widget.LinearLayout.VERTICAL
+        setPadding(dp(16), dp(16), dp(16), dp(20))
+        setBackgroundResource(R.drawable.dialog_background)
+    }
+
+    val titleView = android.widget.TextView(this).apply {
+        text = title
+        textSize = 18f
+        setTextColor(0xFFFFFFFF.toInt())
+        setPadding(dp(8), dp(4), dp(8), dp(12))
+    }
+    root.addView(titleView)
+
+    val input = android.widget.EditText(this).apply {
+        this.hint = hint
+        setText(initialValue)
+        inputType?.let { this.inputType = it }
+        setTextColor(0xFFFFFFFF.toInt())
+        setHintTextColor(0x99FFFFFF.toInt())
+        setBackgroundResource(R.drawable.glass_panel)
+        setPadding(dp(14), dp(12), dp(14), dp(12))
+        imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_DONE
+        setSingleLine()
+        setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE) {
+                onSubmit(text?.toString().orEmpty())
+                sheet.dismiss()
+                true
+            } else {
+                false
+            }
+        }
+    }
+    val inputLp = android.widget.LinearLayout.LayoutParams(
+        android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+    ).apply { bottomMargin = dp(12) }
+    root.addView(input, inputLp)
+
+    val submit = android.widget.TextView(this).apply {
+        text = submitLabel
+        textSize = 15f
+        setTextColor(0xFFFFFFFF.toInt())
+        setPadding(dp(16), dp(14), dp(16), dp(14))
+        setBackgroundResource(R.drawable.glass_panel)
+        foreground = AppCompatResources.getDrawable(this@LauncherActivity, android.R.drawable.list_selector_background)
+        isClickable = true
+        isFocusable = true
+        setOnClickListener {
+            onSubmit(input.text?.toString().orEmpty())
+            sheet.dismiss()
+        }
+    }
+    val submitLp = android.widget.LinearLayout.LayoutParams(
+        android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+    ).apply { bottomMargin = dp(8) }
+    root.addView(submit, submitLp)
+
+    if (!secondaryActionLabel.isNullOrBlank() && onSecondaryAction != null) {
+        val secondary = android.widget.TextView(this).apply {
+            text = secondaryActionLabel
+            textSize = 15f
+            setTextColor(0xFFB6F4FF.toInt())
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            setBackgroundResource(R.drawable.glass_panel)
+            foreground = AppCompatResources.getDrawable(this@LauncherActivity, android.R.drawable.list_selector_background)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                sheet.dismiss()
+                onSecondaryAction.invoke()
+            }
+        }
+        val secondaryLp = android.widget.LinearLayout.LayoutParams(
+            android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(8) }
+        root.addView(secondary, secondaryLp)
+    }
+
+    val cancel = android.widget.TextView(this).apply {
+        text = "Cancel"
+        textSize = 14f
+        setTextColor(0xFF80CBC4.toInt())
+        setPadding(dp(16), dp(12), dp(16), dp(12))
+        gravity = android.view.Gravity.CENTER
+        setOnClickListener { sheet.dismiss() }
+    }
+    root.addView(cancel)
+
+    sheet.setContentView(root)
+    sheet.setOnShowListener {
+        input.requestFocus()
+        input.setSelection(input.text?.length ?: 0)
+        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+        imm?.showSoftInput(input, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+    }
+    sheet.show()
+}
+
+fun showLauncherActionSheet(title: String, actions: List<Pair<String, () -> Unit>>) {
+    showGlassActionSheet(title, actions)
 }
 
 private fun showAddWidgetDialog() {
-    // TODO: Implement widget addition
-    Toast.makeText(this, "Add widget", Toast.LENGTH_SHORT).show()
+    startAddWidgetFlow()
 }
 
 private fun showDockSettings() {
@@ -1040,11 +1201,9 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
         dynamic.add("Shortcuts")
         dynamic.add("Uninstall")
         dynamic.add("App Info")
-        val options = dynamic.toTypedArray()
-        AlertDialog.Builder(this)
-            .setTitle(app.name)
-            .setItems(options) { d, which ->
-                when (options[which]) {
+        val actions = dynamic.map { option ->
+            option to {
+                when (option) {
                     "Set Custom Icon" -> {
                         pendingCustomIconPkg = app.packageName
                         // Use system document picker
@@ -1151,10 +1310,9 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                         } catch (_: Throwable) { }
                     }
                 }
-                d.dismiss()
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+        }
+        showGlassActionSheet(app.name, actions)
     }
 
     private fun showAppShortcuts(app: AppInfo) {
@@ -1178,20 +1336,16 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                 Toast.makeText(this, "No shortcuts available", Toast.LENGTH_SHORT).show()
                 return
             }
-            val labels = shortcuts.map { it.shortLabel?.toString() ?: it.id }.toTypedArray()
-            AlertDialog.Builder(this)
-                .setTitle("Shortcuts: ${app.name}")
-                .setItems(labels) { dlg, idx ->
-                    val si = shortcuts[idx]
+            val actions = shortcuts.map { si ->
+                (si.shortLabel?.toString() ?: si.id) to {
                     try {
                         la.startShortcut(si, null, null)
                     } catch (t: Throwable) {
                         try { la.startShortcut(app.packageName, si.id, null, null, user) } catch (_: Throwable) {}
                     }
-                    dlg.dismiss()
                 }
-                .setNegativeButton("Cancel", null)
-                .show()
+            }
+            showGlassActionSheet("Shortcuts: ${app.name}", actions)
         } catch (t: Throwable) {
             Toast.makeText(this, "Unable to open shortcuts", Toast.LENGTH_SHORT).show()
         }
@@ -1269,25 +1423,34 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
     }
 
     private fun openEditSectionsDialog() {
-        val options = arrayOf("Add Section", "Reset Defaults")
-        AlertDialog.Builder(this)
-            .setTitle("Edit Sections")
-            .setItems(options) { d, which ->
-                when (which) {
-                    0 -> promptAddSection()
-                    1 -> {
-                        sectionOrder = mutableListOf("Communication", "Games", "Media", "Tools", "Social", "Shopping", "Uncategorized")
-                        saveSections()
-                        try {
-                            if (::drawerPagerAdapter.isInitialized) drawerPagerAdapter.setSections(getDrawerSections())
-                        } catch (_: Throwable) {}
-                        refreshDrawerPages()
-                    }
-                }
-                d.dismiss()
+        val actions = listOf(
+            "Add Section" to { promptAddSection() },
+            "Reset Defaults" to {
+                sectionOrder = mutableListOf("Communication", "Games", "Media", "Tools", "Social", "Shopping", "Uncategorized")
+                saveSections()
+                try {
+                    if (::drawerPagerAdapter.isInitialized) drawerPagerAdapter.setSections(getDrawerSections())
+                } catch (_: Throwable) {}
+                refreshDrawerPages()
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+        )
+        showGlassActionSheet("Edit Sections", actions)
+    }
+
+    private fun promptAddSection() {
+        showGlassInputSheet(
+            title = "New Section",
+            hint = "Section name",
+            submitLabel = "Add"
+        ) { enteredName ->
+            val name = enteredName.trim().ifBlank { return@showGlassInputSheet }
+            if (!sectionOrder.contains(name)) sectionOrder.add(0, name)
+            saveSections()
+            try {
+                if (::drawerPagerAdapter.isInitialized) drawerPagerAdapter.setSections(getDrawerSections())
+            } catch (_: Throwable) {}
+            refreshDrawerPages()
+        }
     }
 
     private fun getDrawerSections(): List<String> {
@@ -1330,56 +1493,16 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
 
     // Expose Home Options dialog so fragments can trigger it on long-press
     fun showHomeOptions() {
-        AlertDialog.Builder(this)
-            .setTitle("Home Options")
-            .setItems(
-                buildList {
-                    add(if (isShowLabels()) "Hide Labels" else "Show Labels")
-                    add("Add Widget")
-                    if (hasWidget()) add("Remove Widget")
-                    add("Set Background Image")
-                    add("Clear Background Image")
-                }.toTypedArray()
-            ) { d, which ->
-                val hasW = hasWidget()
-                // Indices:
-                // 0: toggle labels
-                // 1: add widget
-                // 2: remove widget (if present) OR set background
-                // 3: set background (if remove exists) OR clear background
-                // 4: clear background (only when remove exists)
-                when (which) {
-                    0 -> toggleLabels()
-                    1 -> startAddWidgetFlow()
-                    2 -> if (hasW) removeCurrentWidget() else startPickBackgroundImage()
-                    3 -> if (hasW) startPickBackgroundImage() else clearCustomBackground()
-                    4 -> if (hasW) clearCustomBackground() else Unit
-                }
-                d.dismiss()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+        val hasW = hasWidget()
+        val actions = mutableListOf<Pair<String, () -> Unit>>()
+        actions += (if (isShowLabels()) "Hide Labels" else "Show Labels") to { toggleLabels() }
+        actions += "Add Widget" to { startAddWidgetFlow() }
+        if (hasW) actions += "Remove Widget" to { removeCurrentWidget() }
+        actions += "Set Background Image" to { startPickBackgroundImage() }
+        actions += "Clear Background Image" to { clearCustomBackground() }
+        showGlassActionSheet("Home Options", actions)
     }
 
-    private fun promptAddSection() {
-        val input = EditText(this)
-        input.hint = "Section name"
-        AlertDialog.Builder(this)
-            .setTitle("New Section")
-            .setView(input)
-            .setPositiveButton("Add") { d, _ ->
-                val name = input.text.toString().trim().ifBlank { return@setPositiveButton }
-                if (!sectionOrder.contains(name)) sectionOrder.add(0, name)
-                saveSections()
-                try {
-                    if (::drawerPagerAdapter.isInitialized) drawerPagerAdapter.setSections(getDrawerSections())
-                } catch (_: Throwable) {}
-                refreshDrawerPages()
-                d.dismiss()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
     private fun decodeFolders(raw: String): MutableList<Folder> {
         if (raw.isBlank()) return mutableListOf()
         return raw.split("||").mapNotNull { token ->
@@ -1531,6 +1654,13 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                 android.util.Log.d("LauncherActivity", "EnhancedBackupManager initialized")
             } catch (e: Exception) {
                 android.util.Log.e("LauncherActivity", "EnhancedBackupManager initialization failed", e)
+            }
+
+            try {
+                appPrivacyManager = AppPrivacyManager(this)
+                android.util.Log.d("LauncherActivity", "AppPrivacyManager initialized")
+            } catch (e: Exception) {
+                android.util.Log.e("LauncherActivity", "AppPrivacyManager initialization failed", e)
             }
             
             try {
@@ -1846,49 +1976,13 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
 
                 // Long-press on empty home to open quick actions
                 homeScreen.setOnLongClickListener {
-                    AlertDialog.Builder(this)
-                        .setTitle("Home Options")
-                        .setItems(
-                            buildList {
-                                add(if (isShowLabels()) "Hide Labels" else "Show Labels")
-                                add("Add Widget")
-                                if (hasWidget()) add("Remove Widget")
-                            }.toTypedArray()
-                        ) { d, which ->
-                            val hasWidget = hasWidget()
-                            when (which) {
-                                0 -> toggleLabels()
-                                1 -> startAddWidgetFlow()
-                                2 -> if (hasWidget) removeCurrentWidget()
-                            }
-                            d.dismiss()
-                        }
-                        .setNegativeButton("Cancel", null)
-                        .show()
+                    showHomeOptions()
                     true
                 }
 
                 // Also support long-press directly on the pager area (pages can consume touches)
                 homePager.setOnLongClickListener {
-                    AlertDialog.Builder(this)
-                        .setTitle("Home Options")
-                        .setItems(
-                            buildList {
-                                add(if (isShowLabels()) "Hide Labels" else "Show Labels")
-                                add("Add Widget")
-                                if (hasWidget()) add("Remove Widget")
-                            }.toTypedArray()
-                        ) { d, which ->
-                            val hasWidget = hasWidget()
-                            when (which) {
-                                0 -> toggleLabels()
-                                1 -> startAddWidgetFlow()
-                                2 -> if (hasWidget) removeCurrentWidget()
-                            }
-                            d.dismiss()
-                        }
-                        .setNegativeButton("Cancel", null)
-                        .show()
+                    showHomeOptions()
                     true
                 }
 
@@ -1975,6 +2069,7 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                 widgetsRestoredOnce = true
             }
         }
+        loadAppsAsync()
     }
 
     override fun onPause() {
@@ -2455,19 +2550,21 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
         val current = homePager.currentItem
         // With two special pages (0=TODO, 1=Stan), content pages start at position 2
         val contentIndex = (current - 2).coerceIn(0, NORMAL_HOME_PAGES - 1)
-        val options = arrayOf("Add to Dock", "Add to Sidebar", "Add to Home (Page ${'$'}{contentIndex + 1})")
-        AlertDialog.Builder(this)
-            .setTitle(app.name)
-            .setItems(options) { d, which ->
-                when (which) {
-                    0 -> { addToList(KEY_DOCK, app.packageName); rebuildDock() }
-                    1 -> { addToList(KEY_SIDEBAR, app.packageName); rebuildSidebar() }
-                    2 -> { addToHomePage(contentIndex, app.packageName); refreshHomePages() }
-                }
-                d.dismiss()
+        val actions = listOf(
+            "Add to Dock" to {
+                addToList(KEY_DOCK, app.packageName)
+                rebuildDock()
+            },
+            "Add to Sidebar" to {
+                addToList(KEY_SIDEBAR, app.packageName)
+                rebuildSidebar()
+            },
+            "Add to Home (Page ${'$'}{contentIndex + 1})" to {
+                addToHomePage(contentIndex, app.packageName)
+                refreshHomePages()
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+        )
+        showGlassActionSheet(app.name, actions)
     }
 
     private fun isShowLabels(): Boolean = prefs.getBoolean(KEY_SHOW_LABELS, true)
@@ -2982,24 +3079,116 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
         if (appList.isEmpty()) return
         val key = if (forDock) KEY_DOCK else KEY_SIDEBAR
         val current = loadPackageList(key).toMutableSet()
-        val names = appList.map { it.name }.toTypedArray()
-        val checked = appList.map { it.packageName in current }.toBooleanArray()
+        showMultiSelectAppsSheet(
+            title = if (forDock) "Edit Dock" else "Edit Sidebar",
+            preselected = current
+        ) { selected ->
+            // Save in chosen order of appList filtered by selected
+            val ordered = appList.filter { it.packageName in selected }.map { it.packageName }
+            savePackageList(key, ordered)
+            if (forDock) rebuildDock() else rebuildSidebar()
+        }
+    }
 
-        AlertDialog.Builder(this)
-            .setTitle(if (forDock) "Edit Dock" else "Edit Sidebar")
-            .setMultiChoiceItems(names, checked) { _, which, isChecked ->
-                val pkg = appList[which].packageName
-                if (isChecked) current.add(pkg) else current.remove(pkg)
+    private fun showMultiSelectAppsSheet(
+        title: String,
+        preselected: Set<String>,
+        onSave: (Set<String>) -> Unit
+    ) {
+        val sheet = BottomSheetDialog(this)
+        val selected = preselected.toMutableSet()
+
+        val root = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(20))
+            setBackgroundResource(R.drawable.dialog_background)
+        }
+
+        val titleView = android.widget.TextView(this).apply {
+            text = title
+            textSize = 18f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(8), dp(4), dp(8), dp(12))
+        }
+        root.addView(titleView)
+
+        val scroll = android.widget.ScrollView(this)
+        val list = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+        }
+
+        appList.forEach { app ->
+            val row = android.widget.LinearLayout(this).apply {
+                orientation = android.widget.LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(dp(12), dp(10), dp(12), dp(10))
+                setBackgroundResource(R.drawable.glass_panel)
             }
-            .setPositiveButton("Save") { d, _ ->
-                // Save in chosen order of appList filtered by selected
-                val ordered = appList.filter { it.packageName in current }.map { it.packageName }
-                savePackageList(key, ordered)
-                if (forDock) rebuildDock() else rebuildSidebar()
-                d.dismiss()
+
+            val check = android.widget.CheckBox(this).apply {
+                isChecked = app.packageName in selected
+                setOnCheckedChangeListener { _, checked ->
+                    if (checked) selected.add(app.packageName) else selected.remove(app.packageName)
+                }
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+
+            val name = android.widget.TextView(this).apply {
+                text = app.name
+                textSize = 14f
+                setTextColor(0xFFEAF6FF.toInt())
+                setPadding(dp(8), 0, 0, 0)
+            }
+
+            row.setOnClickListener { check.isChecked = !check.isChecked }
+            row.addView(check)
+            row.addView(name)
+
+            val rowLp = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(8) }
+            list.addView(row, rowLp)
+        }
+
+        scroll.addView(list)
+        val scrollLp = android.widget.LinearLayout.LayoutParams(
+            android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(320)
+        ).apply { bottomMargin = dp(12) }
+        root.addView(scroll, scrollLp)
+
+        val save = android.widget.TextView(this).apply {
+            text = "Save"
+            textSize = 15f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            setBackgroundResource(R.drawable.glass_panel)
+            foreground = AppCompatResources.getDrawable(this@LauncherActivity, android.R.drawable.list_selector_background)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                sheet.dismiss()
+                onSave(selected)
+            }
+        }
+        val saveLp = android.widget.LinearLayout.LayoutParams(
+            android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(8) }
+        root.addView(save, saveLp)
+
+        val cancel = android.widget.TextView(this).apply {
+            text = "Cancel"
+            textSize = 14f
+            setTextColor(0xFF80CBC4.toInt())
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            gravity = android.view.Gravity.CENTER
+            setOnClickListener { sheet.dismiss() }
+        }
+        root.addView(cancel)
+
+        sheet.setContentView(root)
+        sheet.show()
     }
 
     private fun attachDragHelper(rv: RecyclerView, adapter: DockSidebarAdapter, isDock: Boolean) {
@@ -3284,15 +3473,33 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
     }
 
     private fun startAddWidgetFlow() {
-        val appWidgetId = appWidgetHost.allocateAppWidgetId()
+        if (!::appWidgetHost.isInitialized) {
+            appWidgetHost = AppWidgetHost(this, APPWIDGET_HOST_ID)
+        }
+        if (!::appWidgetManager.isInitialized) {
+            appWidgetManager = AppWidgetManager.getInstance(this)
+        }
+
+        val appWidgetId = try {
+            appWidgetHost.allocateAppWidgetId()
+        } catch (t: Throwable) {
+            Toast.makeText(this, "Unable to start widget picker", Toast.LENGTH_SHORT).show()
+            return
+        }
         val contentIndex = (homePager.currentItem - 2).coerceIn(0, NORMAL_HOME_PAGES - 1)
         prefs.edit()
             .putInt(KEY_WIDGET_ID, appWidgetId)
             .putInt("widget_page_index", contentIndex)
             .apply()
-        val pickIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_PICK)
-        pickIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-        startActivityForResult(pickIntent, REQ_PICK_APPWIDGET)
+        val pickIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_PICK).apply {
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+        }
+        try {
+            startActivityForResult(pickIntent, REQ_PICK_APPWIDGET)
+        } catch (t: Throwable) {
+            try { appWidgetHost.deleteAppWidgetId(appWidgetId) } catch (_: Throwable) {}
+            Toast.makeText(this, "No widget picker available", Toast.LENGTH_SHORT).show()
+        }
     }
 
     @Deprecated("Deprecated in Activity API but sufficient for this project")
@@ -3362,6 +3569,15 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                 }
             }
             REQ_PICK_APPWIDGET -> {
+                if (resultCode != RESULT_OK) {
+                    val pendingId = data?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1)
+                        ?: prefs.getInt(KEY_WIDGET_ID, -1)
+                    if (pendingId != -1) {
+                        try { appWidgetHost.deleteAppWidgetId(pendingId) } catch (_: Throwable) {}
+                    }
+                    prefs.edit().remove(KEY_WIDGET_ID).remove("widget_page_index").apply()
+                    return
+                }
                 val appWidgetId = data?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1) ?: -1
                 if (appWidgetId != -1) {
                     val pageIndex = prefs.getInt("widget_page_index", 0)
@@ -3373,11 +3589,24 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                         val bindIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_BIND)
                         bindIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                         bindIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, info?.provider)
-                        startActivityForResult(bindIntent, REQ_BIND_APPWIDGET)
+                        try {
+                            startActivityForResult(bindIntent, REQ_BIND_APPWIDGET)
+                        } catch (_: Throwable) {
+                            try { appWidgetHost.deleteAppWidgetId(appWidgetId) } catch (_: Throwable) {}
+                        }
                     }
                 }
             }
             REQ_BIND_APPWIDGET -> {
+                if (resultCode != RESULT_OK) {
+                    val pendingId = data?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1)
+                        ?: prefs.getInt(KEY_WIDGET_ID, -1)
+                    if (pendingId != -1) {
+                        try { appWidgetHost.deleteAppWidgetId(pendingId) } catch (_: Throwable) {}
+                    }
+                    prefs.edit().remove(KEY_WIDGET_ID).remove("widget_page_index").apply()
+                    return
+                }
                 val appWidgetId = data?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1) ?: -1
                 if (appWidgetId != -1) {
                     val pageIndex = prefs.getInt("widget_page_index", -1)
@@ -3388,6 +3617,15 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
                 }
             }
             REQ_CONFIGURE_APPWIDGET -> {
+                if (resultCode != RESULT_OK) {
+                    val pendingId = data?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1)
+                        ?: prefs.getInt(KEY_WIDGET_ID, -1)
+                    if (pendingId != -1) {
+                        try { appWidgetHost.deleteAppWidgetId(pendingId) } catch (_: Throwable) {}
+                    }
+                    prefs.edit().remove(KEY_WIDGET_ID).remove("widget_page_index").apply()
+                    return
+                }
                 val appWidgetId = data?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1) ?: -1
                 if (appWidgetId != -1) {
                     val pageIndex = prefs.getInt("widget_page_index", -1)
@@ -3420,6 +3658,17 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
     }
 
     fun launchApp(app: AppInfo) {
+        if (::appPrivacyManager.isInitialized && appPrivacyManager.isAppLocked(app.packageName)) {
+            val timeoutMs = prefs.getLong("app_lock_timeout_ms", 0L)
+            val lastUnlockTs = prefs.getLong("app_unlock_ts_${app.packageName}", 0L)
+            val timeoutValid = timeoutMs > 0L && (System.currentTimeMillis() - lastUnlockTs) < timeoutMs
+            val oneShotValid = oneShotUnlockedPackages.remove(app.packageName)
+            if (!timeoutValid && !oneShotValid) {
+                requestUnlockForApp(app)
+                return
+            }
+        }
+
         try {
             // Open our settings when selecting the launcher app itself
             if (app.packageName == packageName) {
@@ -3622,6 +3871,91 @@ fun getRecentPackages(): List<String> = loadPackageList(KEY_RECENTS)
             }
         } catch (t: Throwable) {
             Toast.makeText(this, "Launch failed: ${'$'}{t.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun requestUnlockForApp(app: AppInfo) {
+        val mode = prefs.getString("app_lock_auth_mode", "biometric_or_pin") ?: "biometric_or_pin"
+        val requireBiometric = prefs.getBoolean("require_biometric", true)
+
+        when (mode) {
+            "pin_only" -> showPinUnlockDialog(app)
+            "biometric_only" -> {
+                if (requireBiometric) authenticateWithBiometricForApp(app, allowPinFallback = false)
+                else showPinUnlockDialog(app)
+            }
+            else -> {
+                if (requireBiometric) authenticateWithBiometricForApp(app, allowPinFallback = true)
+                else showPinUnlockDialog(app)
+            }
+        }
+    }
+
+    private fun authenticateWithBiometricForApp(app: AppInfo, allowPinFallback: Boolean) {
+        lifecycleScope.launch {
+            val result = appPrivacyManager.authenticateForApp(this@LauncherActivity, app.packageName, app.name)
+            when (result) {
+                is AppPrivacyManager.AuthenticationResult.Success -> {
+                    oneShotUnlockedPackages.add(app.packageName)
+                    prefs.edit().putLong("app_unlock_ts_${app.packageName}", System.currentTimeMillis()).apply()
+                    launchApp(app)
+                }
+                is AppPrivacyManager.AuthenticationResult.PinRequired -> {
+                    if (allowPinFallback) showPinUnlockDialog(app)
+                    else Toast.makeText(this@LauncherActivity, "Biometric authentication required", Toast.LENGTH_SHORT).show()
+                }
+                is AppPrivacyManager.AuthenticationResult.Failed,
+                is AppPrivacyManager.AuthenticationResult.Error -> {
+                    if (allowPinFallback) showPinUnlockDialog(app)
+                    else Toast.makeText(this@LauncherActivity, "Unlock failed", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun showPinUnlockDialog(app: AppInfo) {
+        showGlassInputSheet(
+            title = "Unlock ${app.name}",
+            hint = "Enter PIN",
+            submitLabel = "Unlock",
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD,
+            secondaryActionLabel = "Set PIN",
+            onSecondaryAction = { showSetGlobalPinDialog() }
+        ) { enteredRaw ->
+            val entered = enteredRaw.trim()
+            if (isPinValidForApp(app.packageName, entered)) {
+                oneShotUnlockedPackages.add(app.packageName)
+                prefs.edit().putLong("app_unlock_ts_${app.packageName}", System.currentTimeMillis()).apply()
+                launchApp(app)
+            } else {
+                Toast.makeText(this, "Incorrect PIN", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun isPinValidForApp(packageName: String, enteredPin: String): Boolean {
+        if (enteredPin.isBlank()) return false
+        if (::appPrivacyManager.isInitialized && appPrivacyManager.verifyAppPin(packageName, enteredPin)) {
+            return true
+        }
+        val globalPin = prefs.getString("app_lock_pin", null)
+        return !globalPin.isNullOrBlank() && globalPin == enteredPin
+    }
+
+    private fun showSetGlobalPinDialog() {
+        showGlassInputSheet(
+            title = "Set App Lock PIN",
+            hint = "New 4-8 digit PIN",
+            submitLabel = "Save",
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        ) { pinRaw ->
+            val pin = pinRaw.trim()
+            if (pin.length in 4..8 && pin.all { it.isDigit() }) {
+                prefs.edit().putString("app_lock_pin", pin).apply()
+                Toast.makeText(this, "PIN updated", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "PIN must be 4-8 digits", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 

@@ -1,0 +1,226 @@
+# 7K UI/UX Master Framework (MF)
+
+Version: 1.0
+Scope: Entire launcher + all 7K apps
+Rule: **No plain/default UI controls in final surfaces**. Every component must use 7K design tokens, motion, touch response, and state styling.
+
+---
+
+## 1) Core principles
+
+1. Branded, not generic.
+2. Consistent across launcher + every 7K app.
+3. Touch-first (thumb ergonomics, clear feedback).
+4. Motion with meaning (not decorative noise).
+5. Accessibility is first-class, not optional.
+6. Performance-aware visual richness.
+
+---
+
+## 2) Non-negotiable UI policy
+
+- Disallow unstyled platform defaults in production UI:
+  - `android.R.layout.simple_*`
+  - plain `Button`, plain `Spinner`, plain `Switch` without 7K skin wrappers
+- Every control must map to a custom 7K component family:
+  - `7KButton`, `7KSwitch`, `7KDropdown`, `7KCard`, `7KListItem`, `7KSheet`, `7KDialog`
+- Every screen must consume tokenized style values only (no ad-hoc hardcoded colors/sizes).
+
+---
+
+## 3) Design token system
+
+## 3.1 Color tokens
+
+- `color.bg.base`
+- `color.bg.elevated`
+- `color.bg.glass`
+- `color.surface.primary`
+- `color.surface.secondary`
+- `color.text.primary`
+- `color.text.secondary`
+- `color.text.inverse`
+- `color.brand.primary`
+- `color.brand.secondary`
+- `color.brand.accent`
+- `color.state.success`
+- `color.state.warning`
+- `color.state.error`
+- `color.state.info`
+- `color.focus.ring`
+- `color.border.default`
+- `color.border.strong`
+
+## 3.2 Typography tokens
+
+- `type.display.l`
+- `type.display.m`
+- `type.title.l`
+- `type.title.m`
+- `type.body.l`
+- `type.body.m`
+- `type.body.s`
+- `type.label.l`
+- `type.label.m`
+- `type.mono.s`
+
+## 3.3 Spacing and size tokens
+
+- spacing scale: 4/8/12/16/20/24/32/40
+- min touch target: **48dp** (preferred 52dp for key actions)
+- corner radii: 8/12/16/20/28
+- icon sizes: 16/20/24/32/40/48/56
+- stroke widths: 1/1.5/2dp
+
+## 3.4 Elevation + glass tokens
+
+- `elevation.0/1/2/3/4`
+- `glass.blur.light/medium/heavy`
+- `glass.tint.day/night`
+- fallback surfaces for low-end devices when blur disabled
+
+---
+
+## 4) Interaction model
+
+## 4.1 Touch response
+
+Every tappable element must define:
+- press-in scale: 0.98
+- release spring back: 120–180ms
+- haptic tier: none/light/medium/heavy (context-based)
+- visual pressed state: tint or glow shift
+
+## 4.2 Gesture semantics
+
+- Gesture outcomes must be deterministic.
+- Every gesture action with external target requires explicit setup UI.
+- Gesture conflict map must be maintained (home vs drawer vs sidebar).
+
+## 4.3 Drag/drop behavior
+
+- consistent drag shadow style (rounded + glow)
+- magnetic snap zones (dock/sidebar/home grid)
+- live insertion indicator
+- drop animation (position + scale + fade)
+- undo snackbar for destructive drops/removals
+
+---
+
+## 5) Component library spec
+
+## 5.1 Buttons
+
+- variants: primary/secondary/ghost/destructive
+- sizes: compact/default/large
+- states: default/hover/pressed/disabled/loading
+
+## 5.2 Dropdowns / pickers
+
+- custom sheet-based selector preferred over plain spinner
+- search-enabled for long lists
+- section headers + icon support
+
+## 5.3 Cards and list rows
+
+- unified 7K card primitives with density modes
+- strong selected/focused state
+- optional swipe actions
+
+## 5.4 Dialogs and bottom sheets
+
+- custom header, branded action row
+- safe-area + keyboard-aware layouts
+- destructive confirmations use explicit risk styling
+
+## 5.5 Inputs
+
+- floating/compact labels
+- helper/error text states
+- validation feedback on blur + submit
+
+## 5.6 Switches/toggles/sliders
+
+- custom thumb/track colors
+- expanded hit targets
+- immediate visual + optional haptic confirmation
+
+---
+
+## 6) Launcher-specific UX rules
+
+- Home icon sizing, drawer icon sizing, dock icon sizing must all resolve from shared token mapping.
+- Sidebar and dock actions require contextual menus with clear language.
+- Privacy-locked app launch must always show branded auth gate.
+- Widget add/configure flow must be cancel-safe and recoverable.
+- Empty states must be designed (not blank placeholders).
+
+---
+
+## 7) App-level UX rules (all 7K apps)
+
+- Each app must inherit 7K shell style: top bar, card style, buttons, sheets, and typography scale.
+- No app may use plain Android default dropdown/button/list tile in final UI.
+- Shared navigation and action affordances across ecosystem apps.
+- Cross-app intents must preserve motion continuity where possible.
+
+---
+
+## 8) Accessibility baseline
+
+- contrast ratios:
+  - body text >= 4.5:1
+  - large text >= 3:1
+- touch target >= 48dp
+- screen reader labels for all actionable UI
+- motion-reduction mode for users with animation sensitivity
+- dynamic text scaling support with layout resilience
+
+---
+
+## 9) Performance and quality constraints
+
+- keep frame pacing stable under gesture-heavy interactions
+- adaptive effects tiering by device capability
+- avoid overdraw-heavy layered effects on low-end hardware
+- component render budgets per screen must be profiled
+
+---
+
+## 10) Implementation architecture
+
+- `Theme/Tokens`: single source of truth (colors, typography, dimensions, motion)
+- `Components`: reusable 7K UI kit package
+- `Patterns`: screen templates (settings/list/detail/dashboard/dialog)
+- `Lint Rules`: flag usage of banned default UI patterns
+
+---
+
+## 11) QA checklist for “no generic UI” compliance
+
+A screen passes only if:
+- all controls are tokenized
+- no default spinner/button/list row is visible
+- touch feedback is present and consistent
+- drag/drop states are clear
+- accessibility checks pass
+- dark/light themes both polished
+
+---
+
+## 12) Rollout phases
+
+1. Foundation: tokens + core components
+2. Launcher migration: home/drawer/dock/sidebar/settings
+3. 7K app migration: ecosystem apps in batches
+4. Compliance pass: lint + screenshot diffs + UX QA
+
+---
+
+## 13) Done definition
+
+“Done” means:
+- zero plain default controls in production launcher + 7K apps,
+- all key flows use branded components,
+- touch/drag/motion/accessibility/performance baselines pass,
+- design language feels unified and premium end-to-end.

@@ -81,8 +81,8 @@
                         android:id="@+id/iconSizeSeeker"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:max="100"
-                        android:progress="50" />
+                        android:max="2"
+                        android:progress="1" />
 
                 </LinearLayout>
 
@@ -373,6 +373,30 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Manage Locked Apps"
+                    android:layout_marginBottom="8dp" />
+
+                <Button
+                    android:id="@+id/privacyCenterButton"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Open Privacy Center"
+                    android:layout_marginBottom="8dp" />
+
+                <Button
+                    android:id="@+id/lockTimeoutButton"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Lock Timeout"
+                    android:layout_marginBottom="8dp" />
+
+                <Button
+                    android:id="@+id/authModeButton"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Authentication Mode"
                     android:layout_marginBottom="16dp" />
 
                 <!-- Biometric Required -->

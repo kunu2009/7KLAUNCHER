@@ -6,10 +6,11 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
-import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.sevenk.launcher.data.TodoDatabase
 import com.sevenk.launcher.data.TodoItem
 import com.sevenk.launcher.data.TodoViewModel
@@ -83,25 +84,93 @@ class TodoPageFragment : Fragment() {
     }
 
     private fun showTodoDialog(initialText: String?, onSave: (String) -> Unit) {
-        val input = EditText(requireContext()).apply {
+        val context = requireContext()
+        val sheet = BottomSheetDialog(context)
+
+        val root = android.widget.LinearLayout(context).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            val pad = dp(16)
+            setPadding(pad, pad, pad, dp(20))
+            setBackgroundResource(R.drawable.dialog_background)
+        }
+
+        val titleView = android.widget.TextView(context).apply {
+            text = if (initialText == null) "Add To-Do" else "Edit To-Do"
+            textSize = 18f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(8), dp(4), dp(8), dp(12))
+        }
+        root.addView(titleView)
+
+        val input = EditText(context).apply {
             hint = "New task"
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
             setText(initialText)
-        }
-
-        AlertDialog.Builder(requireContext())
-            .setTitle(if (initialText == null) "Add To-Do" else "Edit To-Do")
-            .setView(input)
-            .setPositiveButton("Save") { d, _ ->
-                val text = input.text?.toString()?.trim().orEmpty()
-                if (text.isNotEmpty()) {
-                    onSave(text)
+            setTextColor(0xFFFFFFFF.toInt())
+            setHintTextColor(0x99FFFFFF.toInt())
+            setBackgroundResource(R.drawable.glass_panel)
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            setSingleLine()
+            imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_DONE
+            setOnEditorActionListener { _, actionId, _ ->
+                if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE) {
+                    val text = this.text?.toString()?.trim().orEmpty()
+                    if (text.isNotEmpty()) onSave(text)
+                    sheet.dismiss()
+                    true
+                } else {
+                    false
                 }
-                d.dismiss()
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+        }
+        val inputLp = android.widget.LinearLayout.LayoutParams(
+            android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(12) }
+        root.addView(input, inputLp)
+
+        val save = android.widget.TextView(context).apply {
+            text = "Save"
+            textSize = 15f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            setBackgroundResource(R.drawable.glass_panel)
+            foreground = AppCompatResources.getDrawable(context, android.R.drawable.list_selector_background)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                val text = input.text?.toString()?.trim().orEmpty()
+                if (text.isNotEmpty()) onSave(text)
+                sheet.dismiss()
+            }
+        }
+        val saveLp = android.widget.LinearLayout.LayoutParams(
+            android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(8) }
+        root.addView(save, saveLp)
+
+        val cancel = android.widget.TextView(context).apply {
+            text = "Cancel"
+            textSize = 14f
+            setTextColor(0xFF80CBC4.toInt())
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            gravity = android.view.Gravity.CENTER
+            setOnClickListener { sheet.dismiss() }
+        }
+        root.addView(cancel)
+
+        sheet.setContentView(root)
+        sheet.setOnShowListener {
+            input.requestFocus()
+            input.setSelection(input.text?.length ?: 0)
+            val imm = context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+            imm?.showSoftInput(input, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        }
+        sheet.show()
     }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     override fun onDestroyView() {
         super.onDestroyView()

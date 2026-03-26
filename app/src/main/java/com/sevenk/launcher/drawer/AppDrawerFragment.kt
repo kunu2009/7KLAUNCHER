@@ -278,53 +278,45 @@ class AppDrawerFragment : Fragment() {
      */
     private fun showAppOptions(app: AppInfo, view: View) {
         val launcher = activity as? LauncherActivity ?: return
-        val options = arrayOf("App Info", "Uninstall", "Add to Home", "Add to Dock", "Add to Sidebar")
-
-        androidx.appcompat.app.AlertDialog.Builder(requireContext())
-            .setTitle(app.name)
-            .setItems(options) { dialog, which ->
-                when (which) {
-                    0 -> { // App Info
-                        try {
-                            val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                            intent.data = android.net.Uri.parse("package:${app.packageName}")
-                            startActivity(intent)
-                        } catch (e: Exception) {
-                            android.widget.Toast.makeText(requireContext(), "Could not open app info", android.widget.Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                    1 -> { // Uninstall
-                        try {
-                            val intent = android.content.Intent(android.content.Intent.ACTION_UNINSTALL_PACKAGE)
-                            intent.data = android.net.Uri.parse("package:${app.packageName}")
-                            startActivity(intent)
-                        } catch (e: Exception) {
-                            android.widget.Toast.makeText(requireContext(), "Could not uninstall app", android.widget.Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                    2 -> { // Add to Home
-                        val currentPage = launcher.getCurrentHomePage()
-                        if (currentPage >= 0) {
-                            launcher.addToHomePage(currentPage, app.packageName)
-                            launcher.refreshHomePages()
-                            android.widget.Toast.makeText(requireContext(), "Added to Home", android.widget.Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                    3 -> { // Add to Dock
-                        launcher.addPackageToListPublic("dock_packages", app.packageName)
-                        launcher.rebuildDockPublic()
-                        android.widget.Toast.makeText(requireContext(), "Added to Dock", android.widget.Toast.LENGTH_SHORT).show()
-                    }
-                    4 -> { // Add to Sidebar
-                        launcher.addPackageToListPublic("sidebar_packages", app.packageName)
-                        launcher.rebuildSidebarPublic()
-                        android.widget.Toast.makeText(requireContext(), "Added to Sidebar", android.widget.Toast.LENGTH_SHORT).show()
-                    }
+        val actions = listOf(
+            "App Info" to {
+                try {
+                    val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    intent.data = android.net.Uri.parse("package:${app.packageName}")
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    android.widget.Toast.makeText(requireContext(), "Could not open app info", android.widget.Toast.LENGTH_SHORT).show()
                 }
-                dialog.dismiss()
+            },
+            "Uninstall" to {
+                try {
+                    val intent = android.content.Intent(android.content.Intent.ACTION_UNINSTALL_PACKAGE)
+                    intent.data = android.net.Uri.parse("package:${app.packageName}")
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    android.widget.Toast.makeText(requireContext(), "Could not uninstall app", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            },
+            "Add to Home" to {
+                val currentPage = launcher.getCurrentHomePage()
+                if (currentPage >= 0) {
+                    launcher.addToHomePage(currentPage, app.packageName)
+                    launcher.refreshHomePages()
+                    android.widget.Toast.makeText(requireContext(), "Added to Home", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            },
+            "Add to Dock" to {
+                launcher.addPackageToListPublic("dock_packages", app.packageName)
+                launcher.rebuildDockPublic()
+                android.widget.Toast.makeText(requireContext(), "Added to Dock", android.widget.Toast.LENGTH_SHORT).show()
+            },
+            "Add to Sidebar" to {
+                launcher.addPackageToListPublic("sidebar_packages", app.packageName)
+                launcher.rebuildSidebarPublic()
+                android.widget.Toast.makeText(requireContext(), "Added to Sidebar", android.widget.Toast.LENGTH_SHORT).show()
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+        )
+        launcher.showLauncherActionSheet(app.name, actions)
     }
 
     companion object {

@@ -7,9 +7,11 @@ import android.os.Bundle
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.switchmaterial.SwitchMaterial
 import com.sevenk.launcher.R
@@ -96,12 +98,19 @@ class EnhancedSettingsActivity : AppCompatActivity() {
         }
         
         // Icon size
-        val iconSize = prefs.getInt("icon_size", 50)
+        val iconSize = prefs.getInt("icon_size", 1).coerceIn(0, 2)
         iconSizeSeeker.progress = iconSize
         iconSizeSeeker.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
-                    prefs.edit().putInt("icon_size", progress).apply()
+                    val mapped = progress.coerceIn(0, 2)
+                    prefs.edit().putInt("icon_size", mapped).apply()
+                    val label = when (mapped) {
+                        0 -> "Small"
+                        2 -> "Large"
+                        else -> "Medium"
+                    }
+                    Toast.makeText(this@EnhancedSettingsActivity, "Icon size: $label", Toast.LENGTH_SHORT).show()
                 }
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
@@ -236,32 +245,156 @@ class EnhancedSettingsActivity : AppCompatActivity() {
         val privacyModeSwitch = findViewById<SwitchMaterial>(R.id.privacyModeSwitch)
         val hiddenAppsButton = findViewById<Button>(R.id.hiddenAppsButton)
         val lockedAppsButton = findViewById<Button>(R.id.lockedAppsButton)
+        val privacyCenterButton = findViewById<Button>(R.id.privacyCenterButton)
+        val lockTimeoutButton = findViewById<Button>(R.id.lockTimeoutButton)
+        val authModeButton = findViewById<Button>(R.id.authModeButton)
         val biometricRequiredSwitch = findViewById<SwitchMaterial>(R.id.biometricRequiredSwitch)
-        
-        privacyModeSwitch.isChecked = prefs.getBoolean("privacy_mode", false)
+
+        privacyModeSwitch.isChecked = appPrivacyManager.isPrivacyModeEnabled()
         privacyModeSwitch.setOnCheckedChangeListener { _, isChecked ->
+            appPrivacyManager.setPrivacyModeEnabled(isChecked)
             prefs.edit().putBoolean("privacy_mode", isChecked).apply()
-            appPrivacyManager.togglePrivacyMode()
+            refreshPrivacyUiSummary()
         }
-        
+
         hiddenAppsButton.setOnClickListener {
-            // TODO: Open hidden apps management
-            val hiddenApps = prefs.getStringSet("hidden_apps", emptySet())?.size ?: 0
-            Toast.makeText(this, "Hidden apps: $hiddenApps", Toast.LENGTH_SHORT).show()
+            startActivity(Intent(this, com.sevenk.launcher.AppPrivacyActivity::class.java))
         }
-        
+
         lockedAppsButton.setOnClickListener {
-            // TODO: Open locked apps management
-            val lockedApps = prefs.getStringSet("locked_apps", emptySet())?.size ?: 0
-            Toast.makeText(this, "Locked apps: $lockedApps", Toast.LENGTH_SHORT).show()
+            startActivity(Intent(this, com.sevenk.launcher.AppPrivacyActivity::class.java))
         }
-        
+
+        privacyCenterButton.setOnClickListener {
+            startActivity(Intent(this, com.sevenk.launcher.ecosystem.PrivacyShieldActivity::class.java))
+        }
+
+        lockTimeoutButton.setOnClickListener {
+            showLockTimeoutDialog()
+        }
+
+        authModeButton.setOnClickListener {
+            showAuthModeDialog()
+        }
+
         // Biometric authentication
         biometricRequiredSwitch.isEnabled = true // Simplified
         biometricRequiredSwitch.isChecked = prefs.getBoolean("require_biometric", true)
         biometricRequiredSwitch.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("require_biometric", isChecked).apply()
+            if (!isChecked && prefs.getString("app_lock_auth_mode", "biometric_or_pin") == "biometric_only") {
+                prefs.edit().putString("app_lock_auth_mode", "pin_only").apply()
+            }
+            refreshPrivacyUiSummary()
         }
+
+        refreshPrivacyUiSummary()
+    }
+
+    private fun showLockTimeoutDialog() {
+        val options = arrayOf("Immediate", "30 seconds", "1 minute", "5 minutes")
+        val values = longArrayOf(0L, 30_000L, 60_000L, 300_000L)
+        val selectedActions = options.mapIndexed { which, label ->
+            label to {
+                prefs.edit().putLong("app_lock_timeout_ms", values[which]).apply()
+                refreshPrivacyUiSummary()
+            }
+        }
+        showGlassActionSheet("App Lock Timeout", selectedActions)
+    }
+
+    private fun showAuthModeDialog() {
+        val labels = arrayOf("Biometric + PIN fallback", "Biometric only", "PIN only")
+        val values = arrayOf("biometric_or_pin", "biometric_only", "pin_only")
+        val actions = labels.mapIndexed { which, label ->
+            label to {
+                prefs.edit().putString("app_lock_auth_mode", values[which]).apply()
+                if (values[which] == "biometric_only") {
+                    prefs.edit().putBoolean("require_biometric", true).apply()
+                    findViewById<SwitchMaterial>(R.id.biometricRequiredSwitch)?.isChecked = true
+                }
+                refreshPrivacyUiSummary()
+            }
+        }
+        showGlassActionSheet("Authentication Mode", actions)
+    }
+
+    private fun showGlassActionSheet(title: String, actions: List<Pair<String, () -> Unit>>) {
+        val sheet = BottomSheetDialog(this)
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(20))
+            setBackgroundResource(R.drawable.dialog_background)
+        }
+
+        val titleView = TextView(this).apply {
+            text = title
+            textSize = 18f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(8), dp(4), dp(8), dp(12))
+        }
+        root.addView(titleView)
+
+        actions.forEach { (label, onClick) ->
+            val item = TextView(this).apply {
+                text = label
+                textSize = 15f
+                setTextColor(0xFFFFFFFF.toInt())
+                setPadding(dp(16), dp(14), dp(16), dp(14))
+                setBackgroundResource(R.drawable.glass_panel)
+                foreground = AppCompatResources.getDrawable(this@EnhancedSettingsActivity, android.R.drawable.list_selector_background)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    sheet.dismiss()
+                    onClick.invoke()
+                }
+            }
+            val lp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(8) }
+            root.addView(item, lp)
+        }
+
+        val cancel = TextView(this).apply {
+            text = "Cancel"
+            textSize = 14f
+            setTextColor(0xFF80CBC4.toInt())
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            gravity = android.view.Gravity.CENTER
+            setOnClickListener { sheet.dismiss() }
+        }
+        root.addView(cancel)
+
+        sheet.setContentView(root)
+        sheet.show()
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    private fun refreshPrivacyUiSummary() {
+        val hiddenCount = appPrivacyManager.getHiddenApps().size
+        val lockedCount = appPrivacyManager.getLockedApps().size
+        findViewById<Button>(R.id.hiddenAppsButton)?.text = "Manage Hidden Apps ($hiddenCount)"
+        findViewById<Button>(R.id.lockedAppsButton)?.text = "Manage Locked Apps ($lockedCount)"
+
+        val timeout = prefs.getLong("app_lock_timeout_ms", 0L)
+        val timeoutLabel = when (timeout) {
+            30_000L -> "30 seconds"
+            60_000L -> "1 minute"
+            300_000L -> "5 minutes"
+            else -> "Immediate"
+        }
+        findViewById<Button>(R.id.lockTimeoutButton)?.text = "Lock Timeout: $timeoutLabel"
+
+        val authMode = prefs.getString("app_lock_auth_mode", "biometric_or_pin") ?: "biometric_or_pin"
+        val authLabel = when (authMode) {
+            "biometric_only" -> "Biometric only"
+            "pin_only" -> "PIN only"
+            else -> "Biometric + PIN"
+        }
+        findViewById<Button>(R.id.authModeButton)?.text = "Authentication Mode: $authLabel"
     }
     
     private fun setupPerformanceSettings() {
@@ -350,14 +483,13 @@ class EnhancedSettingsActivity : AppCompatActivity() {
         
         // Reset settings
         resetSettingsButton.setOnClickListener {
-            androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Reset Settings")
-                .setMessage("This will reset all launcher settings to default. Are you sure?")
-                .setPositiveButton("Reset") { _, _ ->
-                    resetAllSettings()
-                }
-                .setNegativeButton("Cancel", null)
-                .show()
+            showGlassMessageSheet(
+                title = "Reset Settings",
+                message = "This will reset all launcher settings to default. Are you sure?",
+                primaryLabel = "Reset",
+                onPrimary = { resetAllSettings() },
+                secondaryLabel = "Cancel"
+            )
         }
         
         // About
@@ -398,10 +530,11 @@ class EnhancedSettingsActivity : AppCompatActivity() {
                 if (backupInfo?.hasCustomWallpaper == true) append("\n• Custom wallpaper")
             }
             
-            androidx.appcompat.app.AlertDialog.Builder(this@EnhancedSettingsActivity)
-                .setTitle("Restore Backup")
-                .setMessage(message)
-                .setPositiveButton("Restore") { _, _ ->
+            showGlassMessageSheet(
+                title = "Restore Backup",
+                message = message,
+                primaryLabel = "Restore",
+                onPrimary = {
                     lifecycleScope.launch {
                         val success = enhancedBackupManager.importBackup(uri)
                         if (success) {
@@ -410,9 +543,9 @@ class EnhancedSettingsActivity : AppCompatActivity() {
                             Toast.makeText(this@EnhancedSettingsActivity, "Failed to restore backup", Toast.LENGTH_LONG).show()
                         }
                     }
-                }
-                .setNegativeButton("Cancel", null)
-                .show()
+                },
+                secondaryLabel = "Cancel"
+            )
         }
     }
     
@@ -429,9 +562,9 @@ class EnhancedSettingsActivity : AppCompatActivity() {
             "Unknown"
         }
         
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("About 7K Launcher")
-            .setMessage("""
+        showGlassMessageSheet(
+            title = "About 7K Launcher",
+            message = """
                 Version: $version
                 
                 7K Launcher - A modern, customizable Android launcher with glass UI effects, gesture support, and privacy features.
@@ -446,13 +579,93 @@ class EnhancedSettingsActivity : AppCompatActivity() {
                 • Customizable themes
                 
                 Developed with ❤️ for Android
-            """.trimIndent())
-            .setPositiveButton("OK", null)
-            .show()
+            """.trimIndent(),
+            primaryLabel = "OK"
+        )
+    }
+
+    private fun showGlassMessageSheet(
+        title: String,
+        message: String,
+        primaryLabel: String,
+        onPrimary: (() -> Unit)? = null,
+        secondaryLabel: String? = null,
+        onSecondary: (() -> Unit)? = null
+    ) {
+        val sheet = BottomSheetDialog(this)
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(20))
+            setBackgroundResource(R.drawable.dialog_background)
+        }
+
+        val titleView = TextView(this).apply {
+            text = title
+            textSize = 18f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(8), dp(4), dp(8), dp(8))
+        }
+        root.addView(titleView)
+
+        val messageView = TextView(this).apply {
+            text = message
+            textSize = 14f
+            setTextColor(0xFFEAF6FF.toInt())
+            setBackgroundResource(R.drawable.glass_panel)
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+        }
+        val messageLp = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(12) }
+        root.addView(messageView, messageLp)
+
+        val primary = TextView(this).apply {
+            text = primaryLabel
+            textSize = 15f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            setBackgroundResource(R.drawable.glass_panel)
+            foreground = AppCompatResources.getDrawable(this@EnhancedSettingsActivity, android.R.drawable.list_selector_background)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                sheet.dismiss()
+                onPrimary?.invoke()
+            }
+        }
+        val primaryLp = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(8) }
+        root.addView(primary, primaryLp)
+
+        if (!secondaryLabel.isNullOrBlank()) {
+            val secondary = TextView(this).apply {
+                text = secondaryLabel
+                textSize = 14f
+                setTextColor(0xFF80CBC4.toInt())
+                setPadding(dp(16), dp(12), dp(16), dp(12))
+                gravity = android.view.Gravity.CENTER
+                setOnClickListener {
+                    sheet.dismiss()
+                    onSecondary?.invoke()
+                }
+            }
+            root.addView(secondary)
+        }
+
+        sheet.setContentView(root)
+        sheet.show()
     }
     
     override fun onSupportNavigateUp(): Boolean {
         finish()
         return true
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshPrivacyUiSummary()
     }
 }
